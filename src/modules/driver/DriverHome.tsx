@@ -10,8 +10,10 @@ import PrimeRide from '../../../assets/images/icons/prime-ride.svg';
 import UpcomingRides from './components/UpcomingRides';
 import DullDivider from '../../components/DullDivider';
 import PushAlerts from './components/PushAlert';
+import { useNavigation } from '@react-navigation/native';
 
 const DriverHome = () => {
+    const navigation = useNavigation()
     return (
         <>
             <UpcomingRides />
@@ -23,6 +25,7 @@ const DriverHome = () => {
                             <TouchableOpacity
                                 key={index}
                                 style={styles.containerGradient}
+                                onPress={() => navigation.navigate('BookingRoutes', { screen: 'UpcomingRideInfo' })}
                             >
                                 <LinearGradient
                                     colors={['#005935', '#00BF72',]}

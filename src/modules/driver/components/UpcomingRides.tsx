@@ -7,9 +7,11 @@ import { primaryColor } from '../../../theme/colors';
 import DullDivider from '../../../components/DullDivider';
 import Margin from '../../../components/Margin';
 import CustomButton from '../../../components/CustomButton';
+import { useNavigation } from '@react-navigation/native';
 
 const UpcomingRides = () => {
     const [visible, setVisible] = useState(false);
+    const navigation = useNavigation()
     return (
         <>
             <View style={styles.container}>
@@ -86,14 +88,18 @@ const UpcomingRides = () => {
                             title="Accept Ride"
                             status="primary"
                             size="small"
-                            style={{ flexGrow:1 }}
+                            onPress={() => {
+                                setVisible(false)
+                                navigation.navigate('BookingRoutes', { screen: 'AcceptRide' });
+                            }}
+                            style={{ flexGrow: 1 }}
                         />
                         <CustomButton
                             onPress={() => setVisible(false)}
                             title="Reject Ride"
                             status="danger"
                             size="small"
-                            style={{ flexGrow:1 }}
+                            style={{ flexGrow: 1 }}
                         />
                     </View>
                 </Card>

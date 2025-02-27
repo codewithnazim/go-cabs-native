@@ -6,6 +6,9 @@ import BookingDetails from '../modules/booking/BookingDetails';
 import CallDriver from '../modules/booking/CallDriver';
 import MessageDriver from '../modules/booking/MessageDriver';
 import RideCompleted from '../modules/booking/RideComplete';
+import AcceptRide from '../modules/booking/AcceptRide';
+import RideCompleteDriver from '../modules/booking/RideCompleteDriver';
+import UpcomingRideInfo from '../modules/booking/UpcomingRideInfo';
 
 const BookingStack = createNativeStackNavigator();
 
@@ -19,6 +22,9 @@ const BookingNavigator = () => {
                 <BookingStack.Screen name="CallDriver" component={CallDriver} />
                 <BookingStack.Screen name="MessageDriver" component={MessageDriver} />
                 <BookingStack.Screen name="RideCompleted" component={RideCompleted} />
+                <BookingStack.Screen name="AcceptRide" component={AcceptRide} />
+                <BookingStack.Screen name="RideCompleteDriver" component={RideCompleteDriver} />
+                <BookingStack.Screen name="UpcomingRideInfo" component={UpcomingRideInfo} />
             </BookingStack.Navigator>
         </>
     );
