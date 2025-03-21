@@ -1,5 +1,5 @@
 import { TouchableOpacity, View } from 'react-native';
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Input, Text } from '@ui-kitten/components';
 import { useNavigation } from '@react-navigation/native';
 import { primaryColor } from '../../theme/colors';
@@ -9,10 +9,31 @@ import Margin from '../../components/Margin';
 import GoogleIcon from '../../../assets/images/icons/google.svg';
 import FacebookIcon from '../../../assets/images/icons/facebook.svg';
 import AppleIcon from '../../../assets/images/icons/apple.svg';
+import auth from '@react-native-firebase/auth';
+import { User } from '@react-native-firebase/auth';
 
 const Login = () => {
     const navigation = useNavigation();
     const [value, setValue] = React.useState('');
+    const [initializing, setInitializing] = useState(true);
+    const [user, setUser] = useState();
+
+    // Handle user state changes
+  function onAuthStateChanged(user : User) {
+    setUser(user);
+    if (initializing) setInitializing(false);
+  }
+
+  useEffect(() => {
+    const subscriber = auth().onAuthStateChanged(onAuthStateChanged);
+    return subscriber; // unsubscribe on unmount
+  }, []);
+
+
+    const googleLogin = () => {
+        console.log("clciked");
+    }
+
     return (
         <View style={styles.container}>
             <Text style={styles.h1}>
@@ -41,7 +62,7 @@ const Login = () => {
                 Log In with
             </Text>
             <View style={styles.social}>
-                <TouchableOpacity>
+                <TouchableOpacity style={{padding: 10}} onPress={() => googleLogin()}>
                     <GoogleIcon width={50} height={50} />
                 </TouchableOpacity>
                 <TouchableOpacity>
