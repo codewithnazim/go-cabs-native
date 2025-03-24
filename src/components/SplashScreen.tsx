@@ -3,18 +3,29 @@ import React, { useEffect } from 'react';
 import { Text } from '@ui-kitten/components';
 import { useNavigation } from '@react-navigation/native';
 import GoLogo from '../../assets/images/logo.svg';
+import { userEmailSelector } from '../store/selectors/user/userSelectors'; 
+import { useRecoilValue } from 'recoil';
 
 const SplashScreen = () => {
     const navigation = useNavigation();
+    const user = useRecoilValue(userEmailSelector);
+
     useEffect(() => {
-        setTimeout(() => {
-            navigation.navigate('Login' as never);
+        const timer = setTimeout(() => {
+            if (user) {
+                navigation.navigate("UserScreens" as never);
+            } else {
+                navigation.navigate('Login' as never);
+            }
         }, 5000);
-    });
+
+        return () => clearTimeout(timer);
+    }, [user, navigation]);
+
     return (
         <View style={styles.container}>
             <GoLogo width={220} height={114} />
-            <Text style={styles.text}>let’s go</Text>
+            <Text style={styles.text}>let's go</Text>
         </View>
     );
 };
