@@ -88,16 +88,25 @@ android {
     }
    signingConfigs {
     debug {
-        storeFile file('debug.keystore')
-        storePassword 'android'
-        keyAlias 'androiddebugkey'
-        keyPassword 'android'
+        // storeFile file('debug.keystore')
+        // storePassword 'android'
+        // keyAlias 'androiddebugkey'
+        // keyPassword 'android'
+
+        storeFile file(project.property("GOCABS_RELEASE_STORE_FILE"))
+        storePassword project.property("GOCABS_RELEASE_STORE_PASSWORD")
+        keyAlias project.property("GOCABS_RELEASE_KEY_ALIAS")
+        keyPassword project.property("GOCABS_RELEASE_KEY_PASSWORD")
     }
     release {
-        storeFile file('release.keystore')  // Use the correct path
-        storePassword '9479778872'       // Use the password you set during keystore creation
-        keyAlias 'your_key_alias'           // Use the alias you set during keystore creation
-        keyPassword '9479778872'     // Use the password for your alias
+        storeFile file(project.property("GOCABS_RELEASE_STORE_FILE"))
+        storePassword project.property("GOCABS_RELEASE_STORE_PASSWORD")
+        keyAlias project.property("GOCABS_RELEASE_KEY_ALIAS")
+        keyPassword project.property("GOCABS_RELEASE_KEY_PASSWORD")
+        // storeFile file('release.keystore')  // Use the correct path
+        // storePassword '9479778872'       // Use the password you set during keystore creation
+        // keyAlias 'your_key_alias'           // Use the alias you set during keystore creation
+        // keyPassword '9479778872'     // Use the password for your alias
     }
 }
   buildTypes {
