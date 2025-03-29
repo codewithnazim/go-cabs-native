@@ -27,11 +27,11 @@ const Profile = ({route}: any) => {
         await auth().signOut();
         mmkvUtils.setUser(null); // clears persisted user
         setUser(null); // resets Recoil state
-        navigation.navigate("Login" as never);
+        navigation.navigate("AuthScreens", { screen: "Login" });
       } else {
         console.warn("No user is currently signed in.");
         setUser(null);
-        navigation.navigate("Login" as never);
+        navigation.navigate("AuthScreens", { screen: "Login" });
       }
     } catch (error) {
       console.error("Logout error: ", error);
