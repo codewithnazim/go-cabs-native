@@ -25,6 +25,13 @@ import {Driver} from "../../types/driver/driverTypes";
 
 const {width} = Dimensions.get("window");
 
+// Enhanced driver type with animation state
+interface AnimatedDriver extends Driver {
+  animationId: string;
+  visible: boolean;
+  exiting: boolean;
+}
+
 const BookRide = () => {
   const [rideState, setRideState] = useRecoilState(rideAtom);
 
@@ -33,17 +40,19 @@ const BookRide = () => {
   const [isPayment, setIsPayment] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<number | null>(null);
   const [showDrivers, setShowDrivers] = useState(false);
-  const [availableDrivers, setAvailableDrivers] = useState<Driver[]>([]);
-  const [visibleDrivers, setVisibleDrivers] = useState<Driver[]>([]);
+  const [animatedDrivers, setAnimatedDrivers] = useState<AnimatedDriver[]>([]);
 
-  // Animation references
-  const driverAnimations = useRef<
-    {
-      translateX: Animated.Value;
-      progress: Animated.Value;
-      opacity: Animated.Value;
-    }[]
-  >([]);
+  // Animation references - using a Map for better tracking by ID
+  const animationsMap = useRef(
+    new Map<
+      string,
+      {
+        translateX: Animated.Value;
+        progress: Animated.Value;
+        opacity: Animated.Value;
+      }
+    >(),
+  );
 
   const onCheckedChange = (isChecked: any) => {
     setEv(isChecked);
@@ -88,17 +97,67 @@ const BookRide = () => {
     }));
   };
 
+  // Function to start exit animation for a driver
+  const startExitAnimation = (animationId: string) => {
+    const animationValues = animationsMap.current.get(animationId);
+    if (!animationValues) return;
+
+    // Mark this driver as exiting
+    setAnimatedDrivers(prev =>
+      prev.map(driver =>
+        driver.animationId === animationId
+          ? {...driver, exiting: true}
+          : driver,
+      ),
+    );
+
+    // Run the exit animation sequence
+    Animated.sequence([
+      Animated.timing(animationValues.translateX, {
+        toValue: -width,
+        duration: 500,
+        useNativeDriver: true,
+      }),
+      Animated.timing(animationValues.opacity, {
+        toValue: 0,
+        duration: 100,
+        useNativeDriver: true,
+      }),
+    ]).start(() => {
+      // After animation completes, remove the driver
+      setAnimatedDrivers(prev =>
+        prev.map(driver =>
+          driver.animationId === animationId
+            ? {...driver, visible: false}
+            : driver,
+        ),
+      );
+
+      // Clean up animation values
+      setTimeout(() => {
+        animationsMap.current.delete(animationId);
+      }, 100);
+    });
+  };
+
   // Function to handle ride confirmation
   const handleConfirmRide = () => {
-    const randomDrivers = getRandomDrivers();
-    setAvailableDrivers(randomDrivers);
+    // Clear any existing animations
+    animationsMap.current.clear();
 
-    // Initialize animation values for each driver
-    driverAnimations.current = randomDrivers.map(() => ({
-      translateX: new Animated.Value(width), // Start from right side of screen
-      progress: new Animated.Value(0), // Progress bar starts at 0
-      opacity: new Animated.Value(1), // Fully visible
+    const randomDrivers = getRandomDrivers();
+
+    // Create enhanced drivers with animation IDs
+    const enhancedDrivers: AnimatedDriver[] = randomDrivers.map(driver => ({
+      ...driver,
+      animationId: `driver-${driver.id}-${Date.now()}-${Math.random()
+        .toString(36)
+        .substring(2, 9)}`,
+      visible: false,
+      exiting: false,
     }));
+
+    setAnimatedDrivers(enhancedDrivers);
 
     setRideState(prev => ({
       ...prev,
@@ -109,59 +168,61 @@ const BookRide = () => {
     setShowDrivers(true);
     setIsPayment(false);
 
-    // Start with empty visible drivers array
-    setVisibleDrivers([]);
+    // Sequentially animate drivers in
+    enhancedDrivers.forEach((driver, index) => {
+      // Create animation values for this driver
+      const animationValues = {
+        translateX: new Animated.Value(width),
+        progress: new Animated.Value(0),
+        opacity: new Animated.Value(1),
+      };
 
-    // Sequentially add drivers with animation
-    randomDrivers.forEach((driver, index) => {
+      // Store animation values in the map
+      animationsMap.current.set(driver.animationId, animationValues);
+
+      // Schedule driver appearance
       setTimeout(() => {
-        // Add driver to visible list
-        setVisibleDrivers(prev => [...prev, driver]);
+        // Make driver visible
+        setAnimatedDrivers(prev =>
+          prev.map(d =>
+            d.animationId === driver.animationId ? {...d, visible: true} : d,
+          ),
+        );
 
         // Animate driver entry
-        Animated.timing(driverAnimations.current[index].translateX, {
+        Animated.timing(animationValues.translateX, {
           toValue: 0,
           duration: 500,
           useNativeDriver: true,
         }).start();
 
         // Animate progress bar
-        Animated.timing(driverAnimations.current[index].progress, {
+        Animated.timing(animationValues.progress, {
           toValue: 1,
           duration: 12000, // 12 seconds as requested
           useNativeDriver: false,
         }).start(() => {
-          // When progress completes, animate driver exit
-          Animated.sequence([
-            Animated.timing(driverAnimations.current[index].translateX, {
-              toValue: -width,
-              duration: 500,
-              useNativeDriver: true,
-            }),
-            Animated.timing(driverAnimations.current[index].opacity, {
-              toValue: 0,
-              duration: 100,
-              useNativeDriver: true,
-            }),
-          ]).start(() => {
-            // Remove driver from visible list after animation completes
-            setVisibleDrivers(prev => prev.filter((_, i) => i !== index));
-          });
+          // When progress completes, start exit animation
+          startExitAnimation(driver.animationId);
         });
       }, index * 1500); // 1.5 second gap between each driver
     });
   };
 
   // Render a single driver item with animations
-  const renderDriverItem = (driver: Driver, index: number) => {
-    // Only render if we have animation values for this driver
-    if (!driverAnimations.current[index]) return null;
+  const renderDriverItem = (driver: AnimatedDriver) => {
+    // Only render if driver is marked as visible
+    if (!driver.visible) return null;
 
-    const {translateX, progress, opacity} = driverAnimations.current[index];
+    // Get animation values for this driver
+    const animationValues = animationsMap.current.get(driver.animationId);
+    if (!animationValues) return null;
+
+    const {translateX, progress, opacity} = animationValues;
 
     return (
       <Animated.View
-        key={index.toString()}
+        key={driver.animationId}
         style={[
           styles.driverItem,
           {
@@ -276,9 +337,7 @@ const BookRide = () => {
                         </TouchableOpacity>
                       ),
                     )
-                  : visibleDrivers.map((driver, index) =>
-                      renderDriverItem(driver, index),
-                    )}
+                  : animatedDrivers.map(driver => renderDriverItem(driver))}
                 {compare && (
                   <View style={{paddingHorizontal: 20, marginTop: 5}}>
                     <View
