@@ -10,7 +10,7 @@
     "test": "jest",
     "clean": "npm cache clean --force",
     "postinstall": "node ./scripts/patch-react-native.js",
-    "build:android":"cd android && ./gradlew assembleRelease"
+    "build:android": "cd android && ./gradlew assembleRelease"
   },
   "dependencies": {
     "@eva-design/eva": "^2.2.0",
