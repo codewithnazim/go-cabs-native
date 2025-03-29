@@ -10,7 +10,7 @@ import {
 import React, {useState, useRef} from "react";
 import WebView from "react-native-webview";
 import {backgroundPrimary, primaryColor} from "../../theme/colors";
-import {Radio, RadioGroup, Toggle} from "@ui-kitten/components";
+import {Radio, RadioGroup } from "@ui-kitten/components";
 import DullDivider from "../../components/DullDivider";
 import CarIcon from "../../../assets/images/icons/car.svg";
 import CardIcon from "../../../assets/images/icons/card.svg";
@@ -35,7 +35,6 @@ interface AnimatedDriver extends Driver {
 const BookRide = () => {
   const [rideState, setRideState] = useRecoilState(rideAtom);
 
-  const [ev, setEv] = useState(false);
   const [compare, setCompare] = useState(false);
   const [isPayment, setIsPayment] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<number | null>(null);
@@ -54,10 +53,6 @@ const BookRide = () => {
     >(),
   );
 
-  const onCheckedChange = (isChecked: any) => {
-    setEv(isChecked);
-  };
-
   // Function to handle ride type selection
   const handleRideSelection = (rideName: string) => {
     setRideState(prev => ({
@@ -65,7 +60,6 @@ const BookRide = () => {
       selectedRideType: rideName,
     }));
     setIsPayment(true);
-    setEv(false);
   };
 
   // Function to get random drivers
@@ -266,24 +260,6 @@ const BookRide = () => {
     <>
       <ScrollView>
         <View>
-          {ev && (
-            <View style={{padding: 20}}>
-              <Text style={styles.heading}>
-                Plan Comparison{" "}
-                <Text style={[styles.heading, {color: primaryColor}]}>
-                  EV Mode
-                </Text>
-              </Text>
-              <Text
-                style={[
-                  styles.h2,
-                  {textAlign: "center", marginTop: 5, marginBottom: 10},
-                ]}>
-                For the same ride, you are opting, this how will be charges on
-                different platforms
-              </Text>
-            </View>
-          )}
           <View
             style={{
               width: "100%",
@@ -298,18 +274,6 @@ const BookRide = () => {
           </View>
           {!isPayment ? (
             <>
-              <View
-                style={{
-                  flexDirection: "row",
-                  justifyContent: "flex-end",
-                  gap: 10,
-                  alignItems: "center",
-                  marginVertical: 15,
-                  paddingHorizontal: 10,
-                }}>
-                <Text style={styles.switcText}>Switch to EV</Text>
-                <Toggle checked={ev} onChange={onCheckedChange} />
-              </View>
               <DullDivider />
               <View>
                 {!showDrivers
@@ -326,7 +290,6 @@ const BookRide = () => {
                           <CarIcon width={50} height={50} />
                           <View style={{flexGrow: 1}}>
                             <Text style={styles.h1}>
-                              {ev && "EV "}
                               {item.name}
                             </Text>
                             <Text style={styles.h2}>{item.arrival}</Text>
@@ -388,7 +351,6 @@ const BookRide = () => {
                   size="medium"
                   onPress={() => {
                     setIsPayment(true);
-                    setEv(false);
                   }}
                 />
               </View>
