@@ -21,7 +21,7 @@ const BookRide = () => {
     const [ev, setEv] = useState(false);
     const [compare, setCompare] = useState(false);
     const [isPayment, setIsPayment] = useState(false);
-    const [paymentMethod, setPaymentMethod] = useState(0);
+    const [paymentMethod, setPaymentMethod] = useState<number | null>(null);
     const [showDrivers, setShowDrivers] = useState(false);
     const [availableDrivers, setAvailableDrivers] = useState<Driver[]>([]);
 
@@ -50,6 +50,23 @@ const BookRide = () => {
         return selectedDrivers;
     };
 
+    // Function to handle payment method selection
+    const handlePaymentMethodChange = (index: number) => {
+        setPaymentMethod(index);
+
+        // Map payment method index to payment type
+        const paymentTypes = ['metamask', 'credit', 'debit', 'cash'] as const;
+
+        // Update ride state with payment information
+        setRideState(prev => ({
+            ...prev,
+            payment: {
+                method: paymentTypes[index],
+                confirmed: true
+            }
+        }));
+    };
+    
     // Function to handle ride confirmation
     const handleConfirmRide = () => {
         const randomDrivers = getRandomDrivers();
@@ -160,37 +177,64 @@ const BookRide = () => {
                         </View>
                     </>) : (<>
                         <View style={{ padding: 20 }}>
-                            <RadioGroup
-                                selectedIndex={paymentMethod}
-                                onChange={index => setPaymentMethod(index)}
+                            <TouchableOpacity
+                                style={styles.backButton}
+                                onPress={() => setIsPayment(false)}
                             >
-                                <View style={styles.option}>
-                                    <Radio />
-                                    <Text style={styles.h3}>Metamask Wallet</Text>
-                                    <MetamaskIcon width={25} height={25} />
-                                </View>
-                                <View style={styles.option}>
-                                    <Radio />
-                                    <Text style={styles.h3}>Credit Card</Text>
-                                    <CardIcon width={25} height={25} />
-                                </View>
-                                <View style={styles.option}>
-                                    <Radio />
-                                    <Text style={styles.h3}>Debit Card</Text>
-                                    <CardIcon width={25} height={25} />
-                                </View>
-                                <View style={styles.option}>
-                                    <Radio />
-                                    <Text style={styles.h3}>Cash</Text>
-                                    <CashIcon width={25} height={25} />
-                                </View>
+                                <Text style={styles.backButtonText}>← Back to vehicle selection</Text>
+                            </TouchableOpacity>
+                            <RadioGroup
+                                selectedIndex={paymentMethod !== null ? paymentMethod : -1}
+                                onChange={handlePaymentMethodChange}
+                            >
+                                <Radio
+                                    style={styles.option}
+                                >
+                                    {_evaProps => (
+                                        <>
+                                            <Text style={styles.h3}>Metamask Wallet</Text>
+                                            <MetamaskIcon width={25} height={25} />
+                                        </>
+                                    )}
+                                </Radio>
+                                <Radio
+                                    style={styles.option}
+                                >
+                                    {_evaProps => (
+                                        <>
+                                            <Text style={styles.h3}>Credit Card</Text>
+                                            <CardIcon width={25} height={25} />
+                                        </>
+                                    )}
+                                </Radio>
+                                <Radio
+                                    style={styles.option}
+                                >
+                                    {_evaProps => (
+                                        <>
+                                            <Text style={styles.h3}>Debit Card</Text>
+                                            <CardIcon width={25} height={25} />
+                                        </>
+                                    )}
+                                </Radio>
+                                <Radio
+                                    style={styles.option}
+                                >
+                                    {_evaProps => (
+                                        <>
+                                            <Text style={styles.h3}>Cash</Text>
+                                            <CashIcon width={25} height={25} />
+                                        </>
+                                    )}
+                                </Radio>
                             </RadioGroup>
                             <View style={{ marginTop: 15 }}>
                                 <CustomButton
                                     title="Confirm Ride"
-                                    status="primary"
+                                    status={paymentMethod !== null ? "primary" : "disabled"}
                                     size="medium"
                                     onPress={handleConfirmRide}
+                                    disabled={paymentMethod === null}
                                 />
                             </View>
                         </View>
@@ -324,6 +368,15 @@ const styles = StyleSheet.create({
         fontSize: 14,
         fontFamily: 'Montserrat-SemiBold',
         color: "#005231",
+    },
+    backButton: {
+        marginBottom: 15,
+        paddingVertical: 8,
+    },
+    backButtonText: {
+        color: primaryColor,
+        fontSize: 16,
+        fontFamily: 'Montserrat-SemiBold',
     }
 })
 
