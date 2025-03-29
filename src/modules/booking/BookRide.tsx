@@ -1,5 +1,5 @@
 import { StyleSheet, View, Text, ScrollView, TouchableOpacity } from 'react-native'
-import React from 'react'
+import React, { useState } from 'react'
 import WebView from 'react-native-webview'
 import { backgroundPrimary, primaryColor } from '../../theme/colors'
 import { Radio, RadioGroup, Toggle } from '@ui-kitten/components'
@@ -10,18 +10,57 @@ import MetamaskIcon from '../../../assets/images/icons/metamask.svg';
 import CashIcon from '../../../assets/images/icons/cash.svg';
 import CustomButton from '../../components/CustomButton'
 import Margin from '../../components/Margin'
-import { useNavigation } from '@react-navigation/native'
+import { useRecoilState } from 'recoil'
+import { rideAtom } from '../../store/atoms/ride/rideAtom'
+import driverData from '../driver/data/driver.json'
+import { Driver } from '../../types/driver/driverTypes'
 
 const BookRide = () => {
-    const navigation = useNavigation()
+    const [rideState, setRideState] = useRecoilState(rideAtom);
 
-    const [ev, setEv] = React.useState(false);
-    const [compare, setCompare] = React.useState(false);
-    const [isPayment, setIsPayment] = React.useState(false);
-    const [paymentMethod, setPaymentMethod] = React.useState(0);
+    const [ev, setEv] = useState(false);
+    const [compare, setCompare] = useState(false);
+    const [isPayment, setIsPayment] = useState(false);
+    const [paymentMethod, setPaymentMethod] = useState(0);
+    const [showDrivers, setShowDrivers] = useState(false);
+    const [availableDrivers, setAvailableDrivers] = useState<Driver[]>([]);
 
     const onCheckedChange = (isChecked: any) => {
         setEv(isChecked);
+    };
+
+    // Function to handle ride type selection
+    const handleRideSelection = (rideName: string) => {
+        setRideState(prev => ({
+            ...prev,
+            selectedRideType: rideName
+        }));
+        setIsPayment(true);
+        setEv(false);
+    };
+
+    // Function to get random drivers
+    const getRandomDrivers = () => {
+        const driverEntries = Object.entries(driverData);
+        const shuffled = [...driverEntries].sort(() => 0.5 - Math.random());
+        const selectedDrivers = shuffled.slice(0, 5).map(([id, driver]) => ({
+            id,
+            ...driver
+        }));
+        return selectedDrivers;
+    };
+
+    // Function to handle ride confirmation
+    const handleConfirmRide = () => {
+        const randomDrivers = getRandomDrivers();
+        setAvailableDrivers(randomDrivers);
+        setRideState(prev => ({
+            ...prev,
+            availableDrivers: randomDrivers,
+            status: 'searching'
+        }));
+        setShowDrivers(true);
+        setIsPayment(false);
     };
     return (
         <>
@@ -56,16 +95,40 @@ const BookRide = () => {
                         </View>
                         <DullDivider />
                         <View>
-                            {(compare ? ridesDataCompared : ridesData)?.map((item, index) => (
-                                <View key={index.toString()} style={styles.listItem}>
-                                    <CarIcon width={50} height={50} />
-                                    <View style={{ flexGrow: 1 }}>
-                                        <Text style={styles.h1}>{ev && "EV "}{item.name}</Text>
-                                        <Text style={styles.h2}>{item.arrival}</Text>
+                            {!showDrivers ? (
+                                (compare ? ridesDataCompared : ridesData)?.map((item, index) => (
+                                    <TouchableOpacity
+                                        key={index.toString()}
+                                        style={[styles.listItem, rideState.selectedRideType === item.name && styles.selectedRide]}
+                                        onPress={() => handleRideSelection(item.name)}
+                                    >
+                                        <CarIcon width={50} height={50} />
+                                        <View style={{ flexGrow: 1 }}>
+                                            <Text style={styles.h1}>{ev && "EV "}{item.name}</Text>
+                                            <Text style={styles.h2}>{item.arrival}</Text>
+                                        </View>
+                                        <Text style={[styles.h1, { alignSelf: 'flex-start' }]}>{item.price}</Text>
+                                    </TouchableOpacity>
+                                ))
+                            ) : (
+                                availableDrivers.map((driver, index) => (
+                                    <View key={index.toString()} style={styles.driverItem}>
+                                        <View style={styles.driverAvatar}>
+                                            <Text style={styles.driverInitial}>{driver.name.charAt(0)}</Text>
+                                        </View>
+                                        <View style={{ flexGrow: 1 }}>
+                                            <Text style={styles.h1}>{driver.name}</Text>
+                                            <Text style={styles.h2}>{driver.vehiclemodel.split(' ')[0]} • {driver.regnumber.slice(-4)}</Text>
+                                            <View style={styles.ratingContainer}>
+                                                <Text style={styles.rating}>★ {driver.rating}</Text>
+                                            </View>
+                                        </View>
+                                        <TouchableOpacity style={styles.callButton}>
+                                            <Text style={styles.callButtonText}>Call</Text>
+                                        </TouchableOpacity>
                                     </View>
-                                    <Text style={[styles.h1, { alignSelf: 'flex-start' }]}>{item.price}</Text>
-                                </View>
-                            ))}
+                                ))
+                            )}
                             {compare &&
                                 <View style={{ paddingHorizontal: 20, marginTop: 5 }}>
                                     <View style={[styles.listItem, { backgroundColor: "#fff", borderRadius: 8 }]}>
@@ -127,7 +190,7 @@ const BookRide = () => {
                                     title="Confirm Ride"
                                     status="primary"
                                     size="medium"
-                                    onPress={() => navigation.navigate('BookingDetails' as never)}
+                                    onPress={handleConfirmRide}
                                 />
                             </View>
                         </View>
@@ -142,6 +205,55 @@ const BookRide = () => {
 export default BookRide
 
 const styles = StyleSheet.create({
+    selectedRide: {
+        backgroundColor: 'rgba(214, 255, 239, 0.2)',
+        borderWidth: 1,
+        borderColor: primaryColor,
+        borderRadius: 8,
+    },
+    driverItem: {
+        paddingVertical: 15,
+        paddingHorizontal: 20,
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 15,
+        borderBottomWidth: 1,
+        borderBottomColor: 'rgba(255, 255, 255, 0.1)',
+    },
+    driverAvatar: {
+        width: 50,
+        height: 50,
+        borderRadius: 25,
+        backgroundColor: primaryColor,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    driverInitial: {
+        color: '#fff',
+        fontSize: 22,
+        fontFamily: 'Montserrat-Bold',
+    },
+    ratingContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginTop: 4,
+    },
+    rating: {
+        color: '#FFD700',
+        fontSize: 14,
+        fontFamily: 'Montserrat-SemiBold',
+    },
+    callButton: {
+        backgroundColor: primaryColor,
+        paddingVertical: 8,
+        paddingHorizontal: 15,
+        borderRadius: 20,
+    },
+    callButtonText: {
+        color: '#000',
+        fontSize: 14,
+        fontFamily: 'Montserrat-SemiBold',
+    },
     switcText: {
         color: '#fff',
         fontSize: 14,
@@ -214,7 +326,6 @@ const styles = StyleSheet.create({
         color: "#005231",
     }
 })
-
 
 const ridesData = [
     {
