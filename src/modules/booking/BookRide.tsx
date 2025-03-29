@@ -4,8 +4,10 @@ import {
   Text,
   ScrollView,
   TouchableOpacity,
+  Animated,
+  Dimensions,
 } from "react-native";
-import React, {useState} from "react";
+import React, {useState, useRef} from "react";
 import WebView from "react-native-webview";
 import {backgroundPrimary, primaryColor} from "../../theme/colors";
 import {Radio, RadioGroup, Toggle} from "@ui-kitten/components";
@@ -21,6 +23,8 @@ import {rideAtom} from "../../store/atoms/ride/rideAtom";
 import driverData from "../driver/data/driver.json";
 import {Driver} from "../../types/driver/driverTypes";
 
+const {width} = Dimensions.get("window");
+
 const BookRide = () => {
   const [rideState, setRideState] = useRecoilState(rideAtom);
 
@@ -30,6 +34,16 @@ const BookRide = () => {
   const [paymentMethod, setPaymentMethod] = useState<number | null>(null);
   const [showDrivers, setShowDrivers] = useState(false);
   const [availableDrivers, setAvailableDrivers] = useState<Driver[]>([]);
+  const [visibleDrivers, setVisibleDrivers] = useState<Driver[]>([]);
+
+  // Animation references
+  const driverAnimations = useRef<
+    {
+      translateX: Animated.Value;
+      progress: Animated.Value;
+      opacity: Animated.Value;
+    }[]
+  >([]);
 
   const onCheckedChange = (isChecked: any) => {
     setEv(isChecked);
@@ -49,7 +63,8 @@ const BookRide = () => {
   const getRandomDrivers = () => {
     const driverEntries = Object.entries(driverData);
     const shuffled = [...driverEntries].sort(() => 0.5 - Math.random());
-    const selectedDrivers = shuffled.slice(0, 5).map(([id, driver]) => ({
+    // Limit to 4 drivers as requested
+    const selectedDrivers = shuffled.slice(0, 4).map(([id, driver]) => ({
       id,
       ...driver,
     }));
@@ -77,14 +92,115 @@ const BookRide = () => {
   const handleConfirmRide = () => {
     const randomDrivers = getRandomDrivers();
     setAvailableDrivers(randomDrivers);
+
+    // Initialize animation values for each driver
+    driverAnimations.current = randomDrivers.map(() => ({
+      translateX: new Animated.Value(width), // Start from right side of screen
+      progress: new Animated.Value(0), // Progress bar starts at 0
+      opacity: new Animated.Value(1), // Fully visible
+    }));
+
     setRideState(prev => ({
       ...prev,
       availableDrivers: randomDrivers,
       status: "searching",
     }));
+
     setShowDrivers(true);
     setIsPayment(false);
+
+    // Start with empty visible drivers array
+    setVisibleDrivers([]);
+
+    // Sequentially add drivers with animation
+    randomDrivers.forEach((driver, index) => {
+      setTimeout(() => {
+        // Add driver to visible list
+        setVisibleDrivers(prev => [...prev, driver]);
+
+        // Animate driver entry
+        Animated.timing(driverAnimations.current[index].translateX, {
+          toValue: 0,
+          duration: 500,
+          useNativeDriver: true,
+        }).start();
+
+        // Animate progress bar
+        Animated.timing(driverAnimations.current[index].progress, {
+          toValue: 1,
+          duration: 12000, // 12 seconds as requested
+          useNativeDriver: false,
+        }).start(() => {
+          // When progress completes, animate driver exit
+          Animated.sequence([
+            Animated.timing(driverAnimations.current[index].translateX, {
+              toValue: -width,
+              duration: 500,
+              useNativeDriver: true,
+            }),
+            Animated.timing(driverAnimations.current[index].opacity, {
+              toValue: 0,
+              duration: 100,
+              useNativeDriver: true,
+            }),
+          ]).start(() => {
+            // Remove driver from visible list after animation completes
+            setVisibleDrivers(prev => prev.filter((_, i) => i !== index));
+          });
+        });
+      }, index * 1500); // 1.5 second gap between each driver
+    });
   };
+
+  // Render a single driver item with animations
+  const renderDriverItem = (driver: Driver, index: number) => {
+    // Only render if we have animation values for this driver
+    if (!driverAnimations.current[index]) return null;
+
+    const {translateX, progress, opacity} = driverAnimations.current[index];
+
+    return (
+      <Animated.View
+        key={index.toString()}
+        style={[
+          styles.driverItem,
+          {
+            transform: [{translateX}],
+            opacity,
+          },
+        ]}>
+        {/* Progress bar */}
+        <Animated.View
+          style={[
+            styles.progressBar,
+            {
+              width: progress.interpolate({
+                inputRange: [0, 1],
+                outputRange: ["0%", "100%"],
+              }),
+            },
+          ]}
+        />
+
+        <View style={styles.driverAvatar}>
+          <Text style={styles.driverInitial}>{driver.name.charAt(0)}</Text>
+        </View>
+        <View style={{flexGrow: 1}}>
+          <Text style={styles.h1}>{driver.name}</Text>
+          <Text style={styles.h2}>
+            {driver.vehiclemodel.split(" ")[0]} • {driver.regnumber.slice(-4)}
+          </Text>
+          <View style={styles.ratingContainer}>
+            <Text style={styles.rating}>★ {driver.rating}</Text>
+          </View>
+        </View>
+        <TouchableOpacity style={styles.callButton}>
+          <Text style={styles.callButtonText}>Call</Text>
+        </TouchableOpacity>
+      </Animated.View>
+    );
+  };
+
   return (
     <>
       <ScrollView>
@@ -160,28 +276,9 @@ const BookRide = () => {
                         </TouchableOpacity>
                       ),
                     )
-                  : availableDrivers.map((driver, index) => (
-                      <View key={index.toString()} style={styles.driverItem}>
-                        <View style={styles.driverAvatar}>
-                          <Text style={styles.driverInitial}>
-                            {driver.name.charAt(0)}
-                          </Text>
-                        </View>
-                        <View style={{flexGrow: 1}}>
-                          <Text style={styles.h1}>{driver.name}</Text>
-                          <Text style={styles.h2}>
-                            {driver.vehiclemodel.split(" ")[0]} •{" "}
-                            {driver.regnumber.slice(-4)}
-                          </Text>
-                          <View style={styles.ratingContainer}>
-                            <Text style={styles.rating}>★ {driver.rating}</Text>
-                          </View>
-                        </View>
-                        <TouchableOpacity style={styles.callButton}>
-                          <Text style={styles.callButtonText}>Call</Text>
-                        </TouchableOpacity>
-                      </View>
-                    ))}
+                  : visibleDrivers.map((driver, index) =>
+                      renderDriverItem(driver, index),
+                    )}
                 {compare && (
                   <View style={{paddingHorizontal: 20, marginTop: 5}}>
                     <View
@@ -319,6 +416,15 @@ const styles = StyleSheet.create({
     gap: 15,
     borderBottomWidth: 1,
     borderBottomColor: "rgba(255, 255, 255, 0.1)",
+    position: "relative", // For absolute positioning of progress bar
+    overflow: "hidden", // To contain the progress bar
+  },
+  progressBar: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    height: 3,
+    backgroundColor: primaryColor,
   },
   driverAvatar: {
     width: 50,
