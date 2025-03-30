@@ -301,49 +301,8 @@ const BookRide = () => {
                       ),
                     )
                   : animatedDrivers.map(driver => renderDriverItem(driver))}
-                {compare && (
-                  <View style={{paddingHorizontal: 20, marginTop: 5}}>
-                    <View
-                      style={[
-                        styles.listItem,
-                        {backgroundColor: "#fff", borderRadius: 8},
-                      ]}>
-                      <CarIcon width={50} height={50} />
-                      <View style={{flexGrow: 1}}>
-                        <Text
-                          style={[
-                            styles.h1,
-                            {color: primaryColor, fontSize: 18},
-                          ]}>
-                          Go Cabs Rides
-                        </Text>
-                      </View>
-                      <Text
-                        style={[
-                          styles.h1,
-                          {color: primaryColor, fontSize: 18},
-                        ]}>
-                        ₹ 150-198
-                      </Text>
-                    </View>
-                  </View>
-                )}
               </View>
               <Margin margin={10} />
-              <View style={{padding: 10}}>
-                <View style={styles.chipContainer}>
-                  <Text style={[styles.chipText, {paddingLeft: 5}]}>
-                    Compare, how others are charging
-                  </Text>
-                  <TouchableOpacity
-                    onPress={() => setCompare(!compare)}
-                    style={styles.chip}>
-                    <Text style={styles.chipText}>
-                      {compare ? "Revert" : "Compare"}
-                    </Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
               <View style={{paddingHorizontal: 20, marginTop: 5}}>
                 <CustomButton
                   title="Continue Booking Your GO Ride"
