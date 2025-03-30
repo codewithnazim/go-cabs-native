@@ -214,6 +214,17 @@ const BookRide = () => {
 
     const {translateX, progress, opacity} = animationValues;
 
+    const uniqueFares: Record<string, number> = {};
+
+    const generateRandomFare = (driverId: string) => {
+      if (!uniqueFares[driverId]) {
+        const min = 150;
+        const max = 198;
+        uniqueFares[driverId] = Math.floor(Math.random() * (max - min + 1) + min);
+      }
+      return uniqueFares[driverId];
+    };
+
     return (
       <Animated.View
         key={driver.animationId}
@@ -250,7 +261,7 @@ const BookRide = () => {
           </View>
         </View>
         <TouchableOpacity style={styles.callButton}>
-          <Text style={styles.callButtonText}>Call</Text>
+          <Text style={styles.callButtonText}>{generateRandomFare(driver.id || '')}</Text>
         </TouchableOpacity>
       </Animated.View>
     );
