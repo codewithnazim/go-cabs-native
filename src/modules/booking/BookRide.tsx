@@ -22,6 +22,7 @@ import {useRecoilState} from "recoil";
 import {rideAtom} from "../../store/atoms/ride/rideAtom";
 import driverData from "../driver/data/driver.json";
 import {Driver} from "../../types/driver/driverTypes";
+import {useNavigation} from "@react-navigation/native";
 
 const {width} = Dimensions.get("window");
 
@@ -33,6 +34,7 @@ interface AnimatedDriver extends Driver {
 }
 
 const BookRide = () => {
+  const navigation = useNavigation();
   const [rideState, setRideState] = useRecoilState(rideAtom);
 
   const [compare, setCompare] = useState(false);
@@ -249,7 +251,15 @@ const BookRide = () => {
             },
           ]}
         />
-        <TouchableOpacity style={styles.driverItem}>
+        <TouchableOpacity
+          style={styles.driverItem}
+          onPress={() => {
+            setRideState((prev) => ({
+              ...prev,
+              driver: driver,
+            }));
+            navigation.navigate('BookingDetails' as never);
+          }}>
           {/* Driver Avatar */}
           <View style={styles.driverAvatar}>
             <Text style={styles.driverInitial}>{driver.name.charAt(0)}</Text>
