@@ -2,9 +2,7 @@ import React, { useState, useRef } from 'react';
 import { View, TextInput, StyleSheet } from 'react-native';
 import { useTheme } from '@ui-kitten/components';
 
-const OTPInput: React.FC = () => {
-    // Define the OTP state as an array of strings
-    const [otp, setOtp] = useState<string[]>(['', '', '', '', '', '']);
+const OTPInput = ({ otp, setOtp }: any) => {
     const theme = useTheme();
 
     // Reference to store input elements

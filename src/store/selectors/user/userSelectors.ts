@@ -32,3 +32,27 @@ export const userUIDSelector = selector({
         return user?.uid || '';
     },
 });
+
+export const userPhoneNumberSelector = selector({
+    key: 'userPhoneNumberSelector',
+    get: ({ get }) => {
+        const user = get(userAtom);
+        return user?.phoneNumber || '';
+    },
+});
+
+export const userIsPhoneVerifiedSelector = selector({
+    key: 'userIsPhoneVerifiedSelector',
+    get: ({ get }) => {
+        const user = get(userAtom);
+        return user?.isPhoneVerified || '';
+    },
+});
+
+export const userOtpConfirmationSelector = selector({
+    key: 'userOtpConfirmationSelector',
+    get: ({ get }) => {
+        const user = get(userAtom);
+        return user?.confirm || null;
+    },
+});

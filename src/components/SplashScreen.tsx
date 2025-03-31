@@ -3,24 +3,48 @@ import React, { useEffect } from 'react';
 import { Text } from '@ui-kitten/components';
 import { useNavigation } from '@react-navigation/native';
 import GoLogo from '../../assets/images/logo.svg';
-import { userEmailSelector } from '../store/selectors/user/userSelectors'; 
+import { userEmailSelector, userIsPhoneVerifiedSelector, userOtpConfirmationSelector, userPhoneNumberSelector } from '../store/selectors/user/userSelectors';
 import { useRecoilValue } from 'recoil';
+
+import auth from "@react-native-firebase/auth";
+import { mmkvUtils } from '../store/mmkv/storage';
+
 
 const SplashScreen = () => {
     const navigation = useNavigation();
-    const user = useRecoilValue(userEmailSelector);
+    const userEmail = useRecoilValue(userEmailSelector)
+    const userIsPhoneVerified = useRecoilValue(userIsPhoneVerifiedSelector);
+    const userPhoneNumber = useRecoilValue(userPhoneNumberSelector);
+    const userOtpConfirmation = useRecoilValue(userOtpConfirmationSelector)
+
+    async function handleLogout() {
+        await auth().signOut();
+        mmkvUtils.setUser(null);
+        navigation.navigate("Login" as never);
+    }
 
     useEffect(() => {
         const timer = setTimeout(() => {
-            if (user) {
-                navigation.navigate("UserScreens" as never);
+            if (userEmail) {
+                // mmkvUtils.deletePhone();
+                if (!userIsPhoneVerified) {
+                    if (userOtpConfirmation) {
+                        navigation.navigate("VerifyOtp" as never);
+                    }
+                    else {
+                        navigation.navigate("Login" as never);
+                    }
+                }
+                else {
+                    navigation.navigate("UserScreens" as never);
+                }
             } else {
                 navigation.navigate('Login' as never);
             }
         }, 5000);
 
         return () => clearTimeout(timer);
-    }, [user, navigation]);
+    }, [userEmail, navigation]);
 
     return (
         <View style={styles.container}>
