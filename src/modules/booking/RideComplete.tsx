@@ -11,10 +11,15 @@ import { Icon, Input } from '@ui-kitten/components';
 import CustomButton from '../../components/CustomButton';
 import { useNavigation } from '@react-navigation/native';
 import SendIcon from '../../../assets/images/icons/sendIcon-white.svg';
+import { useRecoilValue } from 'recoil';
+import { rideAtom } from '../../store/atoms/ride/rideAtom';
 
 const RideComplete = () => {
     const navigation = useNavigation()
     const [message, setMessage] = useState("");
+    const rideState = useRecoilValue(rideAtom);
+    const driver = rideState.driver;
+
     return (
         <>
             <View style={styles.container}>
@@ -38,7 +43,7 @@ const RideComplete = () => {
                         <View style={{ flexDirection: 'row', gap: 10, alignItems: 'center', }}>
                             <UserAvatar width={45} height={45} />
                             <View>
-                                <Text style={styles.h3}>Naman</Text>
+                                <Text style={styles.h3}>{driver.name}</Text>
                                 <View style={{ flexDirection: 'row', gap: 3, alignItems: 'center', marginTop: -5 }}>
                                     <RatingStar width={15} height={15} />
                                     <RatingStar width={15} height={15} />
@@ -50,7 +55,7 @@ const RideComplete = () => {
                             </View>
                             <View style={{ flexGrow: 1 }} />
                             <Text style={[styles.h3, { alignSelf: 'flex-start' }]}>
-                                KA 03 {'\n'}AB 1234
+                                {driver.vehicle_number}
                             </Text>
                         </View>
                         <DullDivider margin={30} />
