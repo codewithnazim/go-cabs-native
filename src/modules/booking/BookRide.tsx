@@ -10,7 +10,7 @@ import {
 import React, {useState, useRef} from "react";
 import WebView from "react-native-webview";
 import {backgroundPrimary, primaryColor} from "../../theme/colors";
-import {Radio, RadioGroup } from "@ui-kitten/components";
+import {Radio, RadioGroup} from "@ui-kitten/components";
 import DullDivider from "../../components/DullDivider";
 import CarIcon from "../../../assets/images/icons/car.svg";
 import CardIcon from "../../../assets/images/icons/card.svg";
@@ -220,7 +220,9 @@ const BookRide = () => {
       if (!uniqueFares[driverId]) {
         const min = 150;
         const max = 198;
-        uniqueFares[driverId] = Math.floor(Math.random() * (max - min + 1) + min);
+        uniqueFares[driverId] = Math.floor(
+          Math.random() * (max - min + 1) + min,
+        );
       }
       return uniqueFares[driverId];
     };
@@ -247,21 +249,25 @@ const BookRide = () => {
             },
           ]}
         />
-
-        <View style={styles.driverAvatar}>
-          <Text style={styles.driverInitial}>{driver.name.charAt(0)}</Text>
-        </View>
-        <View style={{flexGrow: 1}}>
-          <Text style={styles.h1}>{driver.name}</Text>
-          <Text style={styles.h2}>
-            {driver.vehiclemodel.split(" ")[0]} • {driver.regnumber.slice(-4)}
-          </Text>
-          <View style={styles.ratingContainer}>
-            <Text style={styles.rating}>★ {driver.rating}</Text>
+        <TouchableOpacity style={styles.driverItem}>
+          {/* Driver Avatar */}
+          <View style={styles.driverAvatar}>
+            <Text style={styles.driverInitial}>{driver.name.charAt(0)}</Text>
           </View>
-        </View>
-        <TouchableOpacity style={styles.callButton}>
-          <Text style={styles.callButtonText}>{generateRandomFare(driver.id || '')}</Text>
+
+          {/* Driver Info */}
+          <View style={styles.driverDetails}>
+            <Text style={styles.h1}>{driver.name}</Text>
+            <Text style={styles.h2}>
+              {driver.vehiclemodel.split(" ")[0]} • {driver.regnumber.slice(-4)}
+            </Text>
+            <View style={styles.ratingContainer}>
+              <Text style={styles.rating}>★ {driver.rating}</Text>
+            </View>
+          </View>
+          <Text style={styles.callButtonText}>
+            {generateRandomFare(driver.id || "")}
+          </Text>
         </TouchableOpacity>
       </Animated.View>
     );
@@ -300,9 +306,7 @@ const BookRide = () => {
                           onPress={() => handleRideSelection(item.name)}>
                           <CarIcon width={50} height={50} />
                           <View style={{flexGrow: 1}}>
-                            <Text style={styles.h1}>
-                              {item.name}
-                            </Text>
+                            <Text style={styles.h1}>{item.name}</Text>
                             <Text style={styles.h2}>{item.arrival}</Text>
                           </View>
                           <Text style={[styles.h1, {alignSelf: "flex-start"}]}>
@@ -399,23 +403,23 @@ const styles = StyleSheet.create({
     borderColor: primaryColor,
     borderRadius: 8,
   },
-  driverItem: {
-    paddingVertical: 15,
-    paddingHorizontal: 20,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 15,
-    borderBottomWidth: 1,
-    borderBottomColor: "rgba(255, 255, 255, 0.1)",
-    position: "relative", // For absolute positioning of progress bar
-    overflow: "hidden", // To contain the progress bar
-  },
   progressBar: {
     position: "absolute",
     top: 0,
     left: 0,
     height: 3,
     backgroundColor: primaryColor,
+  },
+  driverItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingVertical: 15,
+    paddingHorizontal: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: "rgba(255, 255, 255, 0.1)",
+    backgroundColor: "rgba(214, 255, 239, 0.1)",
+    borderRadius: 8,
   },
   driverAvatar: {
     width: 50,
@@ -429,6 +433,21 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontSize: 22,
     fontFamily: "Montserrat-Bold",
+  },
+  driverDetails: {
+    flex: 1,
+    marginLeft: 15, // Space between avatar and details
+  },
+  h1: {
+    fontSize: 18,
+    fontFamily: "Montserrat-SemiBold",
+    color: "#fff",
+  },
+  h2: {
+    fontSize: 14,
+    fontFamily: "Montserrat-Regular",
+    color: "#B9B9B9",
+    marginTop: 2,
   },
   ratingContainer: {
     flexDirection: "row",
@@ -465,18 +484,6 @@ const styles = StyleSheet.create({
     fontFamily: "Montserrat-SemiBold",
     color: "#fff",
     textAlign: "center",
-  },
-  h2: {
-    fontSize: 16,
-    fontFamily: "Montserrat-Regular",
-    marginTop: -5,
-    color: "#B9B9B9",
-  },
-  h1: {
-    fontSize: 22,
-    fontFamily: "Montserrat-SemiBold",
-    color: "#fff",
-    marginBottom: 0,
   },
   option: {
     flexDirection: "row",
