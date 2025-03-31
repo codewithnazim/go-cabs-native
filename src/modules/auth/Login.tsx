@@ -137,7 +137,9 @@ const Login = () => {
 
   const handleLogin = () => {
     setLoginLoading(true);
-    if (mmkvUtils.setPhoneNumber(value)) {
+    const isValidPhone = /^\d{10}$/.test(value);
+    if (isValidPhone) {
+      mmkvUtils.setPhoneNumber(value)
       sendOTP(value);
     }
     else {

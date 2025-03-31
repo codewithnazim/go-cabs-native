@@ -22,14 +22,14 @@ export const mmkvUtils = {
   },
   setPhoneNumber: (phoneNumber: string | null) => {
     if (phoneNumber) {
-      const isValidPhone = /^\d{10}$/.test(phoneNumber);
+      // const isValidPhone = /^\d{10}$/.test(phoneNumber);
       var userD = storage.getString("userAtom")
-      if (isValidPhone && userD) {
-        var userData = JSON.parse(userD);
-        userData.phoneNumber = phoneNumber;
-        storage.set("userAtom", JSON.stringify(userData));
-        return true;
-      }
+      // if (isValidPhone && userD) {
+      var userData = JSON.parse(userD);
+      userData.phoneNumber = phoneNumber;
+      storage.set("userAtom", JSON.stringify(userData));
+      return true;
+      // }
     }
     return false;
   },
