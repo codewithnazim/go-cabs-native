@@ -1,7 +1,15 @@
-import {StyleSheet, Text, View, ScrollView} from "react-native";
+import {
+  StyleSheet,
+  Text,
+  View,
+  ScrollView,
+  Modal,
+  TouchableOpacity,
+} from "react-native";
 import React, {useState} from "react";
-import {Icon} from "@ui-kitten/components";
+import {Icon, Button} from "@ui-kitten/components";
 import LocationInput from "../../components/LocationInput";
+import {primaryColor} from "../../theme/colors";
 
 interface Location {
   address: string;
@@ -18,6 +26,8 @@ const SearchDriver = () => {
   const [activeDropdown, setActiveDropdown] = useState<
     "pickup" | "destination" | null
   >(null);
+  const [showPaymentDialog, setShowPaymentDialog] = useState(false);
+  const [showSuccessDialog, setShowSuccessDialog] = useState(false);
   const [recentLocations] = useState([
     "Lalbagh Botanical Garden",
     "MG Road",
@@ -34,6 +44,15 @@ const SearchDriver = () => {
       setDestinationLocation(location);
     }
     setActiveDropdown(null);
+  };
+
+  const handlePayment = () => {
+    setShowPaymentDialog(true);
+    // Simulate payment processing
+    setTimeout(() => {
+      setShowPaymentDialog(false);
+      setShowSuccessDialog(true);
+    }, 2000);
   };
 
   return (
@@ -71,6 +90,19 @@ const SearchDriver = () => {
             onBlur={() => setActiveDropdown(null)}
           />
         </View>
+        {pickupLocation && destinationLocation && (
+          <View style={styles.paymentContainer}>
+            <View style={styles.priceContainer}>
+              <Text style={styles.priceLabel}>Estimated Price:</Text>
+              <Text style={styles.priceValue}>$25</Text>
+            </View>
+            <TouchableOpacity
+              style={styles.paymentButton}
+              onPress={handlePayment}>
+              <Text style={styles.paymentButtonText}>Proceed to Payment</Text>
+            </TouchableOpacity>
+          </View>
+        )}
       </View>
       <ScrollView
         style={styles.recentContainer}
@@ -90,6 +122,54 @@ const SearchDriver = () => {
           </View>
         ))}
       </ScrollView>
+
+      {/* Payment Processing Dialog */}
+      <Modal
+        visible={showPaymentDialog}
+        transparent={true}
+        animationType="fade">
+        <View style={styles.modalContainer}>
+          <View style={styles.modalContent}>
+            <Icon
+              name="sync-outline"
+              fill={primaryColor}
+              width={50}
+              height={50}
+              style={styles.spinningIcon}
+            />
+            <Text style={styles.modalText}>Processing Payment...</Text>
+            <Text style={styles.modalSubText}>
+              Please wait while we process your payment
+            </Text>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Success Dialog */}
+      <Modal
+        visible={showSuccessDialog}
+        transparent={true}
+        animationType="fade">
+        <View style={styles.modalContainer}>
+          <View style={styles.modalContent}>
+            <Icon
+              name="checkmark-circle-outline"
+              fill={primaryColor}
+              width={50}
+              height={50}
+            />
+            <Text style={styles.modalText}>Payment Successful!</Text>
+            <Text style={styles.modalSubText}>
+              Your ride has been confirmed
+            </Text>
+            <TouchableOpacity
+              style={styles.successButton}
+              onPress={() => setShowSuccessDialog(false)}>
+              <Text style={styles.successButtonText}>Done</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 };
@@ -122,5 +202,81 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontFamily: "Montserrat-Regular",
     color: "#fff",
+  },
+  paymentContainer: {
+    marginTop: 20,
+    padding: 15,
+    backgroundColor: "#353f3b",
+    borderRadius: 8,
+  },
+  priceContainer: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 15,
+  },
+  priceLabel: {
+    fontSize: 16,
+    fontFamily: "Montserrat-Regular",
+    color: "#fff",
+  },
+  priceValue: {
+    fontSize: 20,
+    fontFamily: "Montserrat-Bold",
+    color: primaryColor,
+  },
+  paymentButton: {
+    width: "100%",
+    backgroundColor: primaryColor,
+    padding: 12,
+    borderRadius: 8,
+    alignItems: "center",
+  },
+  paymentButtonText: {
+    color: "#fff",
+    fontSize: 16,
+    fontFamily: "Montserrat-SemiBold",
+  },
+  modalContainer: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  modalContent: {
+    backgroundColor: "#353f3b",
+    padding: 20,
+    borderRadius: 8,
+    alignItems: "center",
+    width: "80%",
+  },
+  modalText: {
+    fontSize: 20,
+    fontFamily: "Montserrat-Bold",
+    color: "#fff",
+    marginTop: 15,
+    marginBottom: 5,
+  },
+  modalSubText: {
+    fontSize: 14,
+    fontFamily: "Montserrat-Regular",
+    color: "#fff",
+    textAlign: "center",
+    marginBottom: 20,
+  },
+  successButton: {
+    width: "100%",
+    backgroundColor: primaryColor,
+    padding: 12,
+    borderRadius: 8,
+    alignItems: "center",
+  },
+  successButtonText: {
+    color: "#fff",
+    fontSize: 16,
+    fontFamily: "Montserrat-SemiBold",
+  },
+  spinningIcon: {
+    transform: [{rotate: "0deg"}],
   },
 });
