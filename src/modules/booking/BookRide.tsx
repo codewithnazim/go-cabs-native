@@ -6,6 +6,7 @@ import {
   TouchableOpacity,
   Animated,
   Dimensions,
+  Modal,
 } from "react-native";
 import React, {useState, useRef} from "react";
 import WebView from "react-native-webview";
@@ -23,6 +24,7 @@ import {rideAtom} from "../../store/atoms/ride/rideAtom";
 import driverData from "../driver/data/driver.json";
 import {Driver} from "../../types/driver/driverTypes";
 import {useNavigation} from "@react-navigation/native";
+import {Icon} from "@ui-kitten/components";
 
 const {width} = Dimensions.get("window");
 
@@ -42,6 +44,8 @@ const BookRide = () => {
   const [paymentMethod, setPaymentMethod] = useState<number | null>(null);
   const [showDrivers, setShowDrivers] = useState(false);
   const [animatedDrivers, setAnimatedDrivers] = useState<AnimatedDriver[]>([]);
+  const [showPaymentDialog, setShowPaymentDialog] = useState(false);
+  const [showSuccessDialog, setShowSuccessDialog] = useState(false);
 
   // Animation references - using a Map for better tracking by ID
   const animationsMap = useRef(
@@ -138,6 +142,18 @@ const BookRide = () => {
 
   // Function to handle ride confirmation
   const handleConfirmRide = () => {
+    if (paymentMethod === null) return;
+
+    setShowPaymentDialog(true);
+    // Simulate payment processing
+    setTimeout(() => {
+      setShowPaymentDialog(false);
+      setShowSuccessDialog(true);
+    }, 2000);
+  };
+
+  const handlePaymentSuccess = () => {
+    setShowSuccessDialog(false);
     // Clear any existing animations
     animationsMap.current.clear();
 
@@ -254,11 +270,11 @@ const BookRide = () => {
         <TouchableOpacity
           style={styles.driverItem}
           onPress={() => {
-            setRideState((prev) => ({
+            setRideState(prev => ({
               ...prev,
               driver: driver,
             }));
-            navigation.navigate('BookingDetails' as never);
+            navigation.navigate("BookingDetails" as never);
           }}>
           {/* Driver Avatar */}
           <View style={styles.driverAvatar}>
@@ -400,6 +416,54 @@ const BookRide = () => {
           <Margin margin={10} />
         </View>
       </ScrollView>
+
+      {/* Payment Processing Dialog */}
+      <Modal
+        visible={showPaymentDialog}
+        transparent={true}
+        animationType="fade">
+        <View style={styles.modalContainer}>
+          <View style={styles.modalContent}>
+            <Icon
+              name="sync-outline"
+              fill={primaryColor}
+              width={50}
+              height={50}
+              style={styles.spinningIcon}
+            />
+            <Text style={styles.modalText}>Processing Payment...</Text>
+            <Text style={styles.modalSubText}>
+              Please wait while we process your payment
+            </Text>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Success Dialog */}
+      <Modal
+        visible={showSuccessDialog}
+        transparent={true}
+        animationType="fade">
+        <View style={styles.modalContainer}>
+          <View style={styles.modalContent}>
+            <Icon
+              name="checkmark-circle-outline"
+              fill={primaryColor}
+              width={50}
+              height={50}
+            />
+            <Text style={styles.modalText}>Payment Successful!</Text>
+            <Text style={styles.modalSubText}>
+              Your ride has been confirmed
+            </Text>
+            <TouchableOpacity
+              style={styles.successButton}
+              onPress={handlePaymentSuccess}>
+              <Text style={styles.successButtonText}>Done</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </>
   );
 };
@@ -547,6 +611,48 @@ const styles = StyleSheet.create({
     color: primaryColor,
     fontSize: 16,
     fontFamily: "Montserrat-SemiBold",
+  },
+  modalContainer: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  modalContent: {
+    backgroundColor: "#353f3b",
+    padding: 20,
+    borderRadius: 8,
+    alignItems: "center",
+    width: "80%",
+  },
+  modalText: {
+    fontSize: 20,
+    fontFamily: "Montserrat-Bold",
+    color: "#fff",
+    marginTop: 15,
+    marginBottom: 5,
+  },
+  modalSubText: {
+    fontSize: 14,
+    fontFamily: "Montserrat-Regular",
+    color: "#fff",
+    textAlign: "center",
+    marginBottom: 20,
+  },
+  successButton: {
+    width: "100%",
+    backgroundColor: primaryColor,
+    padding: 12,
+    borderRadius: 8,
+    alignItems: "center",
+  },
+  successButtonText: {
+    color: "#fff",
+    fontSize: 16,
+    fontFamily: "Montserrat-SemiBold",
+  },
+  spinningIcon: {
+    transform: [{rotate: "0deg"}],
   },
 });
 

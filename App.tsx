@@ -9,6 +9,7 @@ import RootNavigator from "./src/routes/RootNavigator";
 import {backgroundPrimary} from "./src/theme/colors";
 import {customMapping} from "./src/theme/customMapping";
 import {RecoilRoot} from "recoil";
+
 const App = () => (
   <RecoilRoot>
     <IconRegistry icons={EvaIconsPack} />
