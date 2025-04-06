@@ -11,13 +11,19 @@ import {Icon} from "@ui-kitten/components";
 
 interface LocationInputProps {
   placeholder: string;
+<<<<<<< HEAD
+  onLocationSelect: (location: any) => void;
+=======
   onLocationSelect: (location: Location) => void;
+>>>>>>> feature/merge-prs
   value?: string;
   isActive?: boolean;
   onFocus?: () => void;
   onBlur?: () => void;
 }
 
+<<<<<<< HEAD
+=======
 interface Location {
   address: string;
   coordinates: {
@@ -26,6 +32,7 @@ interface Location {
   };
 }
 
+>>>>>>> feature/merge-prs
 interface Prediction {
   description: string;
   place_id: string;

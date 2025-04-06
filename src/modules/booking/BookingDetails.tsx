@@ -10,11 +10,20 @@ import {backgroundPrimary, primaryColor} from "../../theme/colors";
 import WebView from "react-native-webview";
 import CarIcon from "../../../assets/images/icons/car.svg";
 import UserAvatar from "../../../assets/images/icons/avatar.svg";
+<<<<<<< HEAD
+import RatingStar from "../../../assets/images/icons/rating-star.svg";
+=======
+>>>>>>> feature/merge-prs
 import Margin from "../../components/Margin";
 import DullDivider from "../../components/DullDivider";
 import {Icon} from "@ui-kitten/components";
 import CustomButton from "../../components/CustomButton";
 import {useNavigation} from "@react-navigation/native";
+<<<<<<< HEAD
+
+const BookingDetails = () => {
+  const navigation = useNavigation();
+=======
 import {useRecoilValue} from "recoil";
 import {rideAtom} from "../../store/atoms/ride/rideAtom";
 
@@ -22,6 +31,7 @@ const BookingDetails = () => {
   const navigation = useNavigation();
   const rideState = useRecoilValue(rideAtom);
   const driver = rideState.driver;
+>>>>>>> feature/merge-prs
   return (
     <>
       <View>
@@ -45,6 +55,39 @@ const BookingDetails = () => {
           <View style={{padding: 20}}>
             <Text style={styles.h4}>Arriving in 2 min</Text>
             <Margin margin={5} />
+<<<<<<< HEAD
+            <View style={{flexDirection: "row", gap: 10, alignItems: "center"}}>
+              <UserAvatar width={45} height={45} />
+              <View>
+                <Text style={styles.h3}>Naman</Text>
+                <View
+                  style={{
+                    flexDirection: "row",
+                    gap: 3,
+                    alignItems: "center",
+                    marginTop: -5,
+                  }}>
+                  <RatingStar width={15} height={15} />
+                  <RatingStar width={15} height={15} />
+                  <RatingStar width={15} height={15} />
+                  <RatingStar width={15} height={15} />
+                  <RatingStar width={15} height={15} />
+                  <Text
+                    style={{
+                      color: primaryColor,
+                      fontFamily: "Montserrat-SemiBold",
+                      marginLeft: 5,
+                      marginTop: 2,
+                    }}>
+                    5
+                  </Text>
+                </View>
+              </View>
+              <View style={{flexGrow: 1}} />
+              <Text style={[styles.h3, {alignSelf: "flex-start"}]}>
+                KA 03 {"\n"}AB 1234
+              </Text>
+=======
             <View style={styles.driverInfoContainer}>
               <UserAvatar width={45} height={45} />
               <View style={styles.driverDetails}>
@@ -57,6 +100,7 @@ const BookingDetails = () => {
                   <Text style={styles.rating}>★ {driver?.rating}</Text>
                 </View>
               </View>
+>>>>>>> feature/merge-prs
             </View>
             <DullDivider margin={30} />
             <View
@@ -210,6 +254,8 @@ const styles = StyleSheet.create({
     fontFamily: "Montserrat-SemiBold",
     color: "#005231",
   },
+<<<<<<< HEAD
+=======
   driverInfoContainer: {
     flexDirection: "row",
     gap: 20,
@@ -241,4 +287,5 @@ const styles = StyleSheet.create({
     fontFamily: "Montserrat-SemiBold",
     color: "#ffd700",
   },
+>>>>>>> feature/merge-prs
 });

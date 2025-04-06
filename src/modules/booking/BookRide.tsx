@@ -4,6 +4,13 @@ import {
   Text,
   ScrollView,
   TouchableOpacity,
+<<<<<<< HEAD
+} from "react-native";
+import React from "react";
+import WebView from "react-native-webview";
+import {backgroundPrimary, primaryColor} from "../../theme/colors";
+import {Radio, RadioGroup, Toggle} from "@ui-kitten/components";
+=======
   Animated,
   Dimensions,
   Modal,
@@ -12,6 +19,7 @@ import React, {useState, useRef} from "react";
 import WebView from "react-native-webview";
 import {backgroundPrimary, primaryColor} from "../../theme/colors";
 import {Radio, RadioGroup} from "@ui-kitten/components";
+>>>>>>> feature/merge-prs
 import DullDivider from "../../components/DullDivider";
 import CarIcon from "../../../assets/images/icons/car.svg";
 import CardIcon from "../../../assets/images/icons/card.svg";
@@ -19,6 +27,217 @@ import MetamaskIcon from "../../../assets/images/icons/metamask.svg";
 import CashIcon from "../../../assets/images/icons/cash.svg";
 import CustomButton from "../../components/CustomButton";
 import Margin from "../../components/Margin";
+<<<<<<< HEAD
+import {useNavigation} from "@react-navigation/native";
+import LocationInput from "../../components/LocationInput";
+
+const BookRide = () => {
+  const navigation = useNavigation();
+
+  const [ev, setEv] = React.useState(false);
+  const [compare, setCompare] = React.useState(false);
+  const [isPayment, setIsPayment] = React.useState(false);
+  const [paymentMethod, setPaymentMethod] = React.useState(0);
+  const [pickupLocation, setPickupLocation] = React.useState("");
+  const [destinationLocation, setDestinationLocation] = React.useState("");
+
+  const onCheckedChange = (isChecked: any) => {
+    setEv(isChecked);
+  };
+
+  const handlePickupSelect = (location: any) => {
+    setPickupLocation(location.address);
+  };
+
+  const handleDestinationSelect = (location: any) => {
+    setDestinationLocation(location.address);
+  };
+
+  return (
+    <>
+      <ScrollView>
+        <View>
+          {ev && (
+            <View style={{padding: 20}}>
+              <Text style={styles.heading}>
+                Plan Comparison{" "}
+                <Text style={[styles.heading, {color: primaryColor}]}>
+                  EV Mode
+                </Text>
+              </Text>
+              <Text
+                style={[
+                  styles.h2,
+                  {textAlign: "center", marginTop: 5, marginBottom: 10},
+                ]}>
+                For the same ride, you are opting, this how will be charges on
+                different platforms
+              </Text>
+            </View>
+          )}
+          <View style={{padding: 20}}>
+            <LocationInput
+              placeholder="Enter Pickup Location"
+              onLocationSelect={handlePickupSelect}
+              value={pickupLocation}
+            />
+            <LocationInput
+              placeholder="Enter Destination"
+              onLocationSelect={handleDestinationSelect}
+              value={destinationLocation}
+            />
+          </View>
+          <View
+            style={{
+              width: "100%",
+              height: 320,
+              backgroundColor: backgroundPrimary,
+            }}>
+            <WebView
+              originWhitelist={["*"]}
+              source={require("./map.html")}
+              style={styles.webview}
+            />
+          </View>
+          {!isPayment ? (
+            <>
+              <View
+                style={{
+                  flexDirection: "row",
+                  justifyContent: "flex-end",
+                  gap: 10,
+                  alignItems: "center",
+                  marginVertical: 15,
+                  paddingHorizontal: 10,
+                }}>
+                <Text style={styles.switcText}>Switch to EV</Text>
+                <Toggle checked={ev} onChange={onCheckedChange} />
+              </View>
+              <DullDivider />
+              <View>
+                {(compare ? ridesDataCompared : ridesData)?.map(
+                  (item, index) => (
+                    <View key={index.toString()} style={styles.listItem}>
+                      <CarIcon width={50} height={50} />
+                      <View style={{flexGrow: 1}}>
+                        <Text style={styles.h1}>
+                          {ev && "EV "}
+                          {item.name}
+                        </Text>
+                        <Text style={styles.h2}>{item.arrival}</Text>
+                      </View>
+                      <Text style={[styles.h1, {alignSelf: "flex-start"}]}>
+                        {item.price}
+                      </Text>
+                    </View>
+                  ),
+                )}
+                {compare && (
+                  <View style={{paddingHorizontal: 20, marginTop: 5}}>
+                    <View
+                      style={[
+                        styles.listItem,
+                        {backgroundColor: "#fff", borderRadius: 8},
+                      ]}>
+                      <CarIcon width={50} height={50} />
+                      <View style={{flexGrow: 1}}>
+                        <Text
+                          style={[
+                            styles.h1,
+                            {color: primaryColor, fontSize: 18},
+                          ]}>
+                          Go Cabs Rides
+                        </Text>
+                      </View>
+                      <Text
+                        style={[
+                          styles.h1,
+                          {color: primaryColor, fontSize: 18},
+                        ]}>
+                        ₹ 150-198
+                      </Text>
+                    </View>
+                  </View>
+                )}
+              </View>
+              <Margin margin={10} />
+              <View style={{padding: 10}}>
+                <View style={styles.chipContainer}>
+                  <Text style={[styles.chipText, {paddingLeft: 5}]}>
+                    Compare, how others are charging
+                  </Text>
+                  <TouchableOpacity
+                    onPress={() => setCompare(!compare)}
+                    style={styles.chip}>
+                    <Text style={styles.chipText}>
+                      {compare ? "Revert" : "Compare"}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+              <View style={{paddingHorizontal: 20, marginTop: 5}}>
+                <CustomButton
+                  title="Continue Booking Your GO Ride"
+                  status="primary"
+                  size="medium"
+                  onPress={() => {
+                    setIsPayment(true);
+                    setEv(false);
+                  }}
+                />
+              </View>
+            </>
+          ) : (
+            <>
+              <View style={{padding: 20}}>
+                <RadioGroup
+                  selectedIndex={paymentMethod}
+                  onChange={index => setPaymentMethod(index)}>
+                  <View style={styles.option}>
+                    <Radio />
+                    <Text style={styles.h3}>Metamask Wallet</Text>
+                    <MetamaskIcon width={25} height={25} />
+                  </View>
+                  <View style={styles.option}>
+                    <Radio />
+                    <Text style={styles.h3}>Credit Card</Text>
+                    <CardIcon width={25} height={25} />
+                  </View>
+                  <View style={styles.option}>
+                    <Radio />
+                    <Text style={styles.h3}>Debit Card</Text>
+                    <CardIcon width={25} height={25} />
+                  </View>
+                  <View style={styles.option}>
+                    <Radio />
+                    <Text style={styles.h3}>Cash</Text>
+                    <CashIcon width={25} height={25} />
+                  </View>
+                </RadioGroup>
+                <View style={{marginTop: 15}}>
+                  <CustomButton
+                    title="Confirm Ride"
+                    status="primary"
+                    size="medium"
+                    onPress={() =>
+                      navigation.navigate("BookingDetails" as never)
+                    }
+                  />
+                </View>
+              </View>
+            </>
+          )}
+          <Margin margin={10} />
+        </View>
+      </ScrollView>
+    </>
+  );
+};
+
+export default BookRide;
+
+const styles = StyleSheet.create({
+=======
 import {useRecoilState} from "recoil";
 import {rideAtom} from "../../store/atoms/ride/rideAtom";
 import driverData from "../driver/data/driver.json";
@@ -544,6 +763,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontFamily: "Montserrat-SemiBold",
   },
+>>>>>>> feature/merge-prs
   switcText: {
     color: "#fff",
     fontSize: 14,
@@ -559,6 +779,21 @@ const styles = StyleSheet.create({
     color: "#fff",
     textAlign: "center",
   },
+<<<<<<< HEAD
+  h2: {
+    fontSize: 16,
+    fontFamily: "Montserrat-Regular",
+    marginTop: -5,
+    color: "#B9B9B9",
+  },
+  h1: {
+    fontSize: 22,
+    fontFamily: "Montserrat-SemiBold",
+    color: "#fff",
+    marginBottom: 0,
+  },
+=======
+>>>>>>> feature/merge-prs
   option: {
     flexDirection: "row",
     alignItems: "center",
@@ -603,6 +838,8 @@ const styles = StyleSheet.create({
     fontFamily: "Montserrat-SemiBold",
     color: "#005231",
   },
+<<<<<<< HEAD
+=======
   backButton: {
     marginBottom: 15,
     paddingVertical: 8,
@@ -654,6 +891,7 @@ const styles = StyleSheet.create({
   spinningIcon: {
     transform: [{rotate: "0deg"}],
   },
+>>>>>>> feature/merge-prs
 });
 
 const ridesData = [

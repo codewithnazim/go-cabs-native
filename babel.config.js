@@ -4,6 +4,16 @@ module.exports = {
     [
       "module:react-native-dotenv",
       {
+<<<<<<< HEAD
+        moduleName: "@env",
+        path: ".env",
+        safe: true,
+        allowUndefined: false,
+      },
+    ],
+  ],
+};
+=======
         "moduleName": "@env",
         "path": ".env",
         "safe": true,
@@ -12,3 +22,4 @@ module.exports = {
     ]
   ]
 };
+>>>>>>> feature/merge-prs
