@@ -77,7 +77,4 @@ yarn-error.log
 
 # env
 .env
-<<<<<<< HEAD
 .env.local
-=======
->>>>>>> feature/merge-prs

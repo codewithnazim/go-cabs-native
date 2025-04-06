@@ -8,10 +8,7 @@ import {EvaIconsPack} from "@ui-kitten/eva-icons";
 import RootNavigator from "./src/routes/RootNavigator";
 import {backgroundPrimary} from "./src/theme/colors";
 import {customMapping} from "./src/theme/customMapping";
-<<<<<<< HEAD
-=======
 import {RecoilRoot} from "recoil";
->>>>>>> feature/merge-prs
 
 const App = () => (
   <RecoilRoot>
