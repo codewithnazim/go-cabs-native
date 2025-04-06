@@ -142,9 +142,13 @@ const BookRide = () => {
 
   // Function to handle ride confirmation
   const handleConfirmRide = () => {
-    if (paymentMethod === null) return;
+    if (paymentMethod === null) {
+      return; // Don't proceed if no payment method is selected
+    }
 
+    // Show payment dialog only when payment method is selected and button is clicked
     setShowPaymentDialog(true);
+
     // Simulate payment processing
     setTimeout(() => {
       setShowPaymentDialog(false);
@@ -365,6 +369,10 @@ const BookRide = () => {
                     ← Back to vehicle selection
                   </Text>
                 </TouchableOpacity>
+                <View style={styles.priceContainer}>
+                  <Text style={styles.priceLabel}>Estimated Price:</Text>
+                  <Text style={styles.priceValue}>$25</Text>
+                </View>
                 <RadioGroup
                   selectedIndex={paymentMethod !== null ? paymentMethod : -1}
                   onChange={handlePaymentMethodChange}>
@@ -653,6 +661,25 @@ const styles = StyleSheet.create({
   },
   spinningIcon: {
     transform: [{rotate: "0deg"}],
+  },
+  priceContainer: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 15,
+    padding: 15,
+    backgroundColor: "#353f3b",
+    borderRadius: 8,
+  },
+  priceLabel: {
+    fontSize: 16,
+    fontFamily: "Montserrat-Regular",
+    color: "#fff",
+  },
+  priceValue: {
+    fontSize: 20,
+    fontFamily: "Montserrat-Bold",
+    color: primaryColor,
   },
 });
 

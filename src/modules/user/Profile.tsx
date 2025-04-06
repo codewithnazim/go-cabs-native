@@ -15,23 +15,34 @@ import {mmkvUtils} from "../../store/mmkv/storage";
 import {useRecoilState} from "recoil";
 import {userAtom} from "../../store/atoms/user/userAtom";
 import {User} from "../../types/user/userTypes";
+import {NativeStackNavigationProp} from "@react-navigation/native-stack";
+
+// Define the navigation param list type
+type RootStackParamList = {
+  AuthScreens: {screen: string};
+  ProfileScreens: {screen: string};
+};
+
+// Define the navigation prop type
+type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
 const Profile = ({route}: any) => {
-  const navigation = useNavigation();
+  const navigation = useNavigation<NavigationProp>();
   const {userType} = route.params || {};
   const [user, setUser] = useRecoilState<User | null>(userAtom);
 
   const handleLogout = async () => {
     try {
-      if (auth().currentUser) {
+      const currentUser = auth().currentUser;
+      if (currentUser) {
         await auth().signOut();
         mmkvUtils.setUser(null); // clears persisted user
         setUser(null); // resets Recoil state
-        navigation.navigate("AuthScreens", { screen: "Login" });
+        navigation.navigate("AuthScreens", {screen: "Login"});
       } else {
         console.warn("No user is currently signed in.");
         setUser(null);
-        navigation.navigate("AuthScreens", { screen: "Login" });
+        navigation.navigate("AuthScreens", {screen: "Login"});
       }
     } catch (error) {
       console.error("Logout error: ", error);
