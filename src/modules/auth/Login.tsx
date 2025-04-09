@@ -9,16 +9,27 @@ import Margin from "../../components/Margin";
 import GoogleIcon from "../../../assets/images/icons/google.svg";
 import FacebookIcon from "../../../assets/images/icons/facebook.svg";
 import AppleIcon from "../../../assets/images/icons/apple.svg";
-import auth from "@react-native-firebase/auth";
+import auth, {FirebaseAuthTypes} from "@react-native-firebase/auth";
 import {GoogleSignin} from "@react-native-google-signin/google-signin";
 import {useRecoilState} from "recoil";
 import {userAtom} from "../../store/atoms/user/userAtom";
 import {User} from "../../types/user/userTypes";
 import {mmkvUtils} from "../../store/mmkv/storage";
 import {FIREBASE_WEB_CLIENT_ID} from "@env";
+import {NativeStackNavigationProp} from "@react-navigation/native-stack";
+
+// Define the navigation param list type
+type RootStackParamList = {
+  UserScreens: {screen: string};
+  AuthScreens: {screen: string};
+  Register: undefined;
+};
+
+// Define the navigation prop type
+type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
 const Login = () => {
-  const navigation = useNavigation();
+  const navigation = useNavigation<NavigationProp>();
   const [value, setValue] = React.useState("");
   const [initializing, setInitializing] = useState(true);
   const [user, setUser] = useRecoilState<User | null>(userAtom);
@@ -31,8 +42,20 @@ const Login = () => {
     webClientId: firebaseWebClientId,
   });
 
-  function onAuthStateChanged(loggedInUser: any | User) {
-    setUser(loggedInUser);
+  function onAuthStateChanged(loggedInUser: FirebaseAuthTypes.User | null) {
+    if (loggedInUser) {
+      // Convert Firebase user to our app's User type
+      const userData: User = {
+        displayName: loggedInUser.displayName || "",
+        uid: loggedInUser.uid,
+        email: loggedInUser.email || "",
+        photoURL: loggedInUser.photoURL || "",
+      };
+      setUser(userData);
+    } else {
+      setUser(null);
+    }
+
     if (initializing) {
       setInitializing(false);
     }
@@ -132,7 +155,7 @@ const Login = () => {
         </TouchableOpacity>
       </View>
       <Text style={styles.h2_bold}>
-        Don’t have an account?{" "}
+        Don't have an account?{" "}
         <Text
           onPress={() => navigation.navigate("Register" as never)}
           style={[styles.h2_bold, styles.underline]}>

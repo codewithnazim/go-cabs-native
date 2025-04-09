@@ -65,6 +65,13 @@ const SearchDriver = () => {
       }));
     }
     setActiveDropdown(null);
+
+    // Check if both locations are filled and navigate to ride page
+    if (type === "pickup" && destinationLocation) {
+      navigation.navigate("BookingRoutes" as never);
+    } else if (type === "destination" && pickupLocation) {
+      navigation.navigate("BookingRoutes" as never);
+    }
   };
 
   const handlePayment = () => {
@@ -117,19 +124,6 @@ const SearchDriver = () => {
             onBlur={() => setTimeout(() => setActiveDropdown(null), 200)}
           />
         </View>
-        {pickupLocation && destinationLocation && (
-          <View style={styles.paymentContainer}>
-            <View style={styles.priceContainer}>
-              <Text style={styles.priceLabel}>Estimated Price:</Text>
-              <Text style={styles.priceValue}>$25</Text>
-            </View>
-            <TouchableOpacity
-              style={styles.paymentButton}
-              onPress={handlePayment}>
-              <Text style={styles.paymentButtonText}>Proceed to Payment</Text>
-            </TouchableOpacity>
-          </View>
-        )}
       </View>
       <ScrollView
         style={styles.recentContainer}
