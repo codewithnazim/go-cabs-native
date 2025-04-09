@@ -2,10 +2,11 @@ import {DriverBid} from "../driver/driverBidTypes";
 import {Driver} from "../driver/driverTypes";
 
 export interface RideState {
+  selectedRideType?: string;
   selectedBid?: DriverBid["bidId"];
   walletAddress?: Driver["walletAddress"];
   driverLocation?: {
-    latitude: Driver["driverlocation"]["latitude"]  ;
+    latitude: Driver["driverlocation"]["latitude"];
     longitude: Driver["driverlocation"]["longitude"];
   };
   fare?: {
