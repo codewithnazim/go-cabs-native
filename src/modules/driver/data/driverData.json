@@ -1,0 +1,26 @@
+{
+    "-OM1PpVDNmpzNvPJdULA": {
+      "driverlocation": { "latitude": "19.076", "longitude": "72.8777" },
+      "name": "Rajesh Kumar",
+      "phone": "9876543210",
+      "rating": "4.8",
+      "regnumber": "MH12AB1234",
+      "vehiclemodel": "Maruti Suzuki Dzire",
+      "vehicletype": "Sedan",
+      "walletAddress": "0x1234567890123456789012345678901234567890",
+      "bidAmount": 100,
+      "estimatedArrivalMinutes": 10,
+      "estimatedTripDurationMinutes": 20,
+      "status": "pending",
+      "createdAt": "2021-01-01T00:00:00Z",
+      "expiresAt": "2021-01-01T00:00:00Z",
+      "vehicleStatus": {
+        "batteryLevel": 50,
+        "estimatedRange": 100
+      },
+      "driverLocation": {
+        "latitude": "19.076",
+        "longitude": "72.8777"
+      }
+    }
+}
