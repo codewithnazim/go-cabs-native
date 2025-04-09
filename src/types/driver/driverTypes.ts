@@ -12,10 +12,5 @@ export interface Driver {
     longitude: string;
   };
   bidAmount?: number;
-}
-
-export interface DriverBid {
-  driverId: string;
-  amount: number;
-  timeStamp: Date;
+  walletAddress?: string;
 }
