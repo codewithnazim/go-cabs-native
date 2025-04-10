@@ -6,6 +6,7 @@ export interface RideState {
   selectedRideType?: string;
   selectedBid?: DriverBid["bidId"];
   walletAddress?: Driver["walletAddress"];
+  driver?: Driver;
   driverLocation?: {
     latitude: Driver["driverlocation"]["latitude"];
     longitude: Driver["driverlocation"]["longitude"];

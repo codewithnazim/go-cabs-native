@@ -17,11 +17,12 @@ import CustomButton from "../../components/CustomButton";
 import {useNavigation} from "@react-navigation/native";
 import {useRecoilValue} from "recoil";
 import {rideAtom} from "../../store/atoms/ride/rideAtom";
+import { RootNavigationProp } from "../../types/navigation/navigation.types";
 
 const BookingDetails = () => {
-  const navigation = useNavigation();
-  const rideState = useRecoilValue(rideAtom);
-  const driver = rideState.driver;
+  const navigation = useNavigation<RootNavigationProp>();
+  const driver = useRecoilValue(rideAtom).driver;
+
   return (
     <>
       <View>
