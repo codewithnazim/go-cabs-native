@@ -1,24 +1,47 @@
 import { StyleSheet, View } from 'react-native';
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { Text } from '@ui-kitten/components';
 import { useNavigation } from '@react-navigation/native';
 import GoLogo from '../../assets/images/logo.svg';
-import { userEmailSelector } from '../store/selectors/user/userSelectors'; 
+import { userEmailSelector } from '../store/selectors/user/userSelectors';
 import { useRecoilValue } from 'recoil';
+import auth from '@react-native-firebase/auth';
+import { GoogleSignin } from '@react-native-google-signin/google-signin';
+import { RootNavigationProp } from '../types/navigation/navigation.types';
 
 const SplashScreen = () => {
-    const navigation = useNavigation();
+    const navigation = useNavigation<RootNavigationProp>();
     const user = useRecoilValue(userEmailSelector);
+    const hasCheckedAuth = useRef(false);
 
     useEffect(() => {
-        const timer = setTimeout(() => {
-            if (user) {
-                navigation.navigate("UserScreens" as never);
-            } else {
-                navigation.navigate('Login' as never);
-            }
-        }, 5000);
+        if (hasCheckedAuth.current) return;
 
+        const checkAuthState = async () => {
+            try {
+                const currentUser = auth().currentUser;
+                const googleUser = await GoogleSignin.getCurrentUser();
+                const isGoogleSignedIn = !!googleUser;
+
+                if (isGoogleSignedIn && !currentUser) {
+                    await GoogleSignin.signOut();
+                }
+
+                const shouldNavigateToHome = currentUser || isGoogleSignedIn || user;
+                if (shouldNavigateToHome) {
+                    navigation.navigate('UserScreens', { screen: 'Home' });
+                } else {
+                    navigation.navigate('AuthScreens', { screen: 'Login' });
+                }
+            } catch (error) {
+                console.error('Auth state check error:', error);
+                navigation.navigate('AuthScreens', { screen: 'Login' });
+            } finally {
+                hasCheckedAuth.current = true;
+            }
+        };
+
+        const timer = setTimeout(checkAuthState, 1000);
         return () => clearTimeout(timer);
     }, [user, navigation]);
 

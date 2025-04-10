@@ -1,7 +1,7 @@
 import {TouchableOpacity, View, ActivityIndicator} from "react-native";
-import React, {useEffect, useState} from "react";
+import React, {useEffect, useState, useCallback, useRef} from "react";
 import {Input, Text} from "@ui-kitten/components";
-import {useNavigation} from "@react-navigation/native";
+import {useNavigation, useFocusEffect} from "@react-navigation/native";
 import {primaryColor} from "../../theme/colors";
 import {styles} from "./styles";
 import CustomButton from "../../components/CustomButton";
@@ -16,93 +16,114 @@ import {userAtom} from "../../store/atoms/user/userAtom";
 import {User} from "../../types/user/userTypes";
 import {mmkvUtils} from "../../store/mmkv/storage";
 import {FIREBASE_WEB_CLIENT_ID} from "@env";
-import {NativeStackNavigationProp} from "@react-navigation/native-stack";
-
-// Define the navigation param list type
-type RootStackParamList = {
-  UserScreens: {screen: string};
-  AuthScreens: {screen: string};
-  Register: undefined;
-};
-
-// Define the navigation prop type
-type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
+import { RootNavigationProp } from '../../types/navigation/navigation.types';
 
 const Login = () => {
-  const navigation = useNavigation<NavigationProp>();
+  const navigation = useNavigation<RootNavigationProp>();
   const [value, setValue] = React.useState("");
   const [initializing, setInitializing] = useState(true);
-  const [user, setUser] = useRecoilState<User | null>(userAtom);
+  const [_, setUser] = useRecoilState<User | null>(userAtom);
   const [loading, setLoading] = useState(false);
+  const isFirstRender = useRef(true);
 
   const firebaseWebClientId = FIREBASE_WEB_CLIENT_ID;
-  console.log("web client", firebaseWebClientId);
+  // console.log("web client", firebaseWebClientId);
+  useEffect(() => {
+    GoogleSignin.configure({
+      webClientId: firebaseWebClientId,
+      offlineAccess: true,
+    });
+  }, [firebaseWebClientId]);
 
-  GoogleSignin.configure({
-    webClientId: firebaseWebClientId,
-  });
+  // Reset loading state when screen comes into focus, but only once after logout
+  useFocusEffect(
+    useCallback(() => {
+      if (isFirstRender.current) {
+        isFirstRender.current = false;
+        return;
+      }
 
-  function onAuthStateChanged(loggedInUser: FirebaseAuthTypes.User | null) {
-    if (loggedInUser) {
-      // Convert Firebase user to our app's User type
-      const userData: User = {
-        displayName: loggedInUser.displayName || "",
-        uid: loggedInUser.uid,
-        email: loggedInUser.email || "",
-        photoURL: loggedInUser.photoURL || "",
+      // Reset loading state when screen comes into focus
+      setLoading(false);
+
+      // Check if user is already signed in
+      const checkGoogleSignIn = async () => {
+        try {
+          // Try to get current user from Google Sign-In
+          const googleUser = await GoogleSignin.getCurrentUser();
+          if (googleUser) {
+            // If signed in with Google but not with Firebase, sign out from Google
+            const currentUser = auth().currentUser;
+            if (!currentUser) {
+              await GoogleSignin.signOut();
+            }
+          }
+        } catch (error) {
+          // console.log("Google Sign-In check error:", error);
+        }
       };
-      setUser(userData);
-    } else {
-      setUser(null);
-    }
 
-    if (initializing) {
-      setInitializing(false);
-    }
-  }
+      checkGoogleSignIn();
+    }, []),
+  );
+
+  const onAuthStateChanged = useCallback(
+    (loggedInUser: FirebaseAuthTypes.User | null) => {
+      if (loggedInUser) {
+        // Convert Firebase user to our app's User type
+        const userData: User = {
+          displayName: loggedInUser.displayName || "",
+          uid: loggedInUser.uid,
+          email: loggedInUser.email || "",
+          photoURL: loggedInUser.photoURL || "",
+        };
+        setUser(userData);
+        mmkvUtils.setUser(userData);
+
+        // Navigate to home screen when user is authenticated
+        navigation.navigate("UserScreens", {screen: "Home"});
+      } else {
+        setUser(null);
+      }
+
+      if (initializing) {
+        setInitializing(false);
+      }
+    },
+    [initializing, navigation, setUser],
+  );
 
   useEffect(() => {
     const subscriber = auth().onAuthStateChanged(onAuthStateChanged);
     return subscriber;
-  });
+  }, [onAuthStateChanged]);
 
   const onGoogleButtonPress = async () => {
     try {
       setLoading(true);
+
       // Check if your device supports Google Play
       await GoogleSignin.hasPlayServices({showPlayServicesUpdateDialog: true});
-      const signInResult = await GoogleSignin.signIn();
-      let idToken = signInResult.data?.idToken;
 
-      if (!idToken) {
-        // if you are using older versions of google-signin
-        idToken = signInResult.data?.idToken;
-      }
+      // Sign in with Google
+      await GoogleSignin.signIn();
+
+      // Get the ID token
+      const {idToken} = await GoogleSignin.getTokens();
+
       if (!idToken) {
         throw new Error("No ID token found");
       }
 
       // Create a Google credential with the token
       const googleCredential = auth.GoogleAuthProvider.credential(idToken);
-      // Sign-in the user with the credential
-      const userCredential = await auth().signInWithCredential(
-        googleCredential,
-      );
-      let loggedinUser = userCredential.user;
-      // Save user data to the userAtom
-      const userData = {
-        displayName: loggedinUser.displayName || "",
-        uid: loggedinUser.uid,
-        email: loggedinUser.email || "",
-        photoURL: loggedinUser.photoURL || "",
-      };
-      setUser(userData);
-      mmkvUtils.setUser(userData);
 
-      navigation.navigate("UserScreens", {screen: "Home"});
+      // Sign-in the user with the credential
+      await auth().signInWithCredential(googleCredential);
+
+      // Navigation will be handled by onAuthStateChanged
     } catch (error) {
       console.error("Google sign-in error:", error);
-    } finally {
       setLoading(false);
     }
   };
@@ -134,13 +155,7 @@ const Login = () => {
       </View>
       <Text style={[styles.h2_bold, {color: primaryColor}]}>Log In with</Text>
       <View style={styles.social}>
-        <TouchableOpacity
-          disabled={loading}
-          onPress={() =>
-            onGoogleButtonPress().then(() =>
-              console.log("Signed in with Google!"),
-            )
-          }>
+        <TouchableOpacity disabled={loading} onPress={onGoogleButtonPress}>
           {loading ? (
             <ActivityIndicator size="small" color="#000" />
           ) : (
