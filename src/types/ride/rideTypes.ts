@@ -2,6 +2,7 @@ import {DriverBid} from "../driver/driverBidTypes";
 import {Driver} from "../driver/driverTypes";
 
 export interface RideState {
+  email?: string;
   selectedRideType?: string;
   selectedBid?: DriverBid["bidId"];
   walletAddress?: Driver["walletAddress"];

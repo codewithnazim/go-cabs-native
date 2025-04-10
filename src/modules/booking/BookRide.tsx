@@ -21,7 +21,7 @@ import CustomButton from "../../components/CustomButton";
 import Margin from "../../components/Margin";
 import {useRecoilState} from "recoil";
 import {rideAtom} from "../../store/atoms/ride/rideAtom";
-import driverData from "../driver/data/driver.json";
+import driverData from "../driver/data/driverData.json";
 import {Driver} from "../../types/driver/driverTypes";
 import {useNavigation} from "@react-navigation/native";
 import {Icon} from "@ui-kitten/components";
@@ -296,7 +296,7 @@ const BookRide = () => {
             </View>
           </View>
           <Text style={styles.callButtonText}>
-            {generateRandomFare(driver.id || "")}
+            {driver.bidAmount}
           </Text>
         </TouchableOpacity>
       </Animated.View>
