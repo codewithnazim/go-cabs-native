@@ -9,7 +9,6 @@
     "start": "react-native start --reset-cache",
     "test": "jest",
     "clean": "npm cache clean --force",
-    "postinstall": "node ./scripts/patch-react-native.js",
     "build:android": "cd android && ./gradlew assembleRelease"
   },
   "dependencies": {
