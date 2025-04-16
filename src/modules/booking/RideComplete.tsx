@@ -19,12 +19,16 @@ import {useNavigation} from "@react-navigation/native";
 import SendIcon from "../../../assets/images/icons/sendIcon-white.svg";
 import {useRecoilValue} from 'recoil';
 import {rideAtom} from '../../store/atoms/ride/rideAtom';
+import { RootNavigationProp } from "../../types/navigation/navigation.types";
 
 const RideComplete = () => {
-  const navigation = useNavigation();
+  const navigation = useNavigation<RootNavigationProp>();
   const [message, setMessage] = useState("");
   const rideState = useRecoilValue(rideAtom);
   const driver = rideState.driver;
+  const driverWalletAddress = rideState.driver?.walletAddress;
+  console.log("driverWalletAddress", driverWalletAddress);
+  
 
   return (
     <>
@@ -54,7 +58,7 @@ const RideComplete = () => {
             <View style={{flexDirection: "row", gap: 10, alignItems: "center"}}>
               <UserAvatar width={45} height={45} />
               <View>
-                <Text style={styles.h3}>{driver.name}</Text>
+                <Text style={styles.h3}>{driver?.name}</Text>
                 <View
                   style={{
                     flexDirection: "row",
@@ -80,7 +84,7 @@ const RideComplete = () => {
               </View>
               <View style={{flexGrow: 1}} />
               <Text style={[styles.h3, {alignSelf: "flex-start"}]}>
-                {driver.vehicle_number}
+                {driver?.vehiclemodel}
               </Text>
             </View>
             <DullDivider margin={30} />

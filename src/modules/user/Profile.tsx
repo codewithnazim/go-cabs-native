@@ -1,7 +1,6 @@
 import {StyleSheet, Text, TouchableOpacity, View} from "react-native";
 import React from "react";
 import ProfileAvatar from "../../../assets/images/icons/profile-avatar.svg";
-// import SheildIcon from '../../../assets/images/icons/sheild-icon.svg'
 import RatingStar from "../../../assets/images/icons/rating-star.svg";
 import {primaryColor} from "../../theme/colors";
 import Margin from "../../components/Margin";
@@ -15,37 +14,31 @@ import {mmkvUtils} from "../../store/mmkv/storage";
 import {useRecoilState} from "recoil";
 import {userAtom} from "../../store/atoms/user/userAtom";
 import {User} from "../../types/user/userTypes";
-import {NativeStackNavigationProp} from "@react-navigation/native-stack";
-
-// Define the navigation param list type
-type RootStackParamList = {
-  AuthScreens: {screen: string};
-  ProfileScreens: {screen: string};
-};
-
-// Define the navigation prop type
-type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
+import {GoogleSignin} from "@react-native-google-signin/google-signin";
+import {RootNavigationProp} from "../../types/navigation/navigation.types";
+import {ProfileStackParamList} from "../../types/navigation/navigation.types";
 
 const Profile = ({route}: any) => {
-  const navigation = useNavigation<NavigationProp>();
+  const navigation = useNavigation<RootNavigationProp>();
   const {userType} = route.params || {};
-  const [user, setUser] = useRecoilState<User | null>(userAtom);
+  const [_, setUser] = useRecoilState<User | null>(userAtom);
 
   const handleLogout = async () => {
     try {
+      await GoogleSignin.revokeAccess();
+      await GoogleSignin.signOut();
       const currentUser = auth().currentUser;
       if (currentUser) {
         await auth().signOut();
-        mmkvUtils.setUser(null); // clears persisted user
-        setUser(null); // resets Recoil state
-        navigation.navigate("AuthScreens", {screen: "Login"});
-      } else {
-        console.warn("No user is currently signed in.");
-        setUser(null);
-        navigation.navigate("AuthScreens", {screen: "Login"});
       }
+      mmkvUtils.setUser(null);
+      setUser(null);
+      setTimeout(() => {
+        navigation.navigate("AuthScreens", {screen: "Login"});
+      }, 100);
     } catch (error) {
       console.error("Logout error: ", error);
+      navigation.navigate("AuthScreens", {screen: "Login"});
     }
   };
 
@@ -127,37 +120,37 @@ export default Profile;
 const profileListItems = [
   {
     title: "2-Step Verification",
-    path: "TwoStepVerification",
+    path: "TwoStepVerification" as keyof ProfileStackParamList,
     icon: "lock-outline",
   },
   {
     title: "Emergency contact",
-    path: "EmergencyContact",
+    path: "EmergencyContact" as keyof ProfileStackParamList,
     icon: "phone-call",
   },
   {
     title: "Settings",
-    path: "Settings",
+    path: "Settings" as keyof ProfileStackParamList,
     icon: "settings-2",
   },
   {
     title: "Manage your account",
-    path: "ManageAccount",
+    path: "ManageAccount" as keyof ProfileStackParamList,
     icon: "person-outline",
   },
   {
     title: "FAQs",
-    path: "FAQs",
+    path: "FAQs" as keyof ProfileStackParamList,
     icon: "question-mark-circle",
   },
   {
     title: "Privacy policy",
-    path: "PrivacyPolicy",
+    path: "PrivacyPolicy" as keyof ProfileStackParamList,
     icon: "file-text",
   },
   {
     title: "Terms and Condition",
-    path: "TermsAndCondition",
+    path: "TermsAndCondition" as keyof ProfileStackParamList,
     icon: "file-text",
   },
 ];
