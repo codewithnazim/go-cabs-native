@@ -17,7 +17,7 @@ import CustomButton from "../../components/CustomButton";
 import {useNavigation} from "@react-navigation/native";
 import {useRecoilValue} from "recoil";
 import {rideAtom} from "../../store/atoms/ride/rideAtom";
-import { RootNavigationProp } from "../../types/navigation/navigation.types";
+import {RootNavigationProp} from "../../types/navigation/navigation.types";
 
 const BookingDetails = () => {
   const navigation = useNavigation<RootNavigationProp>();

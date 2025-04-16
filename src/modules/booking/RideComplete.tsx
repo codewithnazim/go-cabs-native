@@ -4,6 +4,7 @@ import {
   Text,
   TouchableOpacity,
   View,
+  Modal,
 } from "react-native";
 import React, {useState} from "react";
 import {backgroundPrimary, primaryColor} from "../../theme/colors";
@@ -17,18 +18,46 @@ import {Icon, Input} from "@ui-kitten/components";
 import CustomButton from "../../components/CustomButton";
 import {useNavigation} from "@react-navigation/native";
 import SendIcon from "../../../assets/images/icons/sendIcon-white.svg";
-import {useRecoilValue} from 'recoil';
-import {rideAtom} from '../../store/atoms/ride/rideAtom';
-import { RootNavigationProp } from "../../types/navigation/navigation.types";
+import {useRecoilState, useRecoilValue} from "recoil";
+import {rideAtom} from "../../store/atoms/ride/rideAtom";
+import {RootNavigationProp} from "../../types/navigation/navigation.types";
 
 const RideComplete = () => {
   const navigation = useNavigation<RootNavigationProp>();
   const [message, setMessage] = useState("");
-  const rideState = useRecoilValue(rideAtom);
+  const [rideState, setRideState] = useRecoilState(rideAtom);
+  const baseFare = rideState.fare?.baseFare;
   const driver = rideState.driver;
   const driverWalletAddress = rideState.driver?.walletAddress;
-  console.log("driverWalletAddress", driverWalletAddress);
-  
+  const [showPaymentDialog, setShowPaymentDialog] = useState(false);
+  const [showSuccessDialog, setShowSuccessDialog] = useState(false);
+
+  // Function to handle payment processing
+  const handlePayment = () => {
+    setShowPaymentDialog(true);
+
+    // Simulate payment processing
+    setTimeout(() => {
+      setShowPaymentDialog(false);
+      setShowSuccessDialog(true);
+
+      // Update ride state to completed
+      setRideState(prev => ({
+        ...prev,
+        status: "completed",
+        payment: {
+          method: prev.payment?.method || "metamask",
+          confirmed: true,
+        },
+      }));
+    }, 2000);
+  };
+
+  // Function to handle payment success
+  const handlePaymentSuccess = () => {
+    setShowSuccessDialog(false);
+    navigation.navigate("RideCompleted" as never);
+  };
 
   return (
     <>
@@ -185,7 +214,31 @@ const RideComplete = () => {
                 You saved 3 kg of CO₂ emissions on this ride!
               </Text>
             </View>
-            <Margin margin={40} />
+            <Margin margin={30} />
+            <View style={styles.fareCard}>
+              <Text style={styles.fareTitle}>Ride Fare Breakdown</Text>
+              <View style={styles.fareRow}>
+                <Text style={styles.fareLabel}>Base Fare</Text>
+                <Text style={styles.fareValue}>
+                  ₹{baseFare !== undefined ? baseFare : "N/A"}
+                </Text>
+              </View>
+              <View style={styles.fareRow}>
+                <Text style={styles.fareLabel}>Service Fee</Text>
+                <Text style={styles.fareValue}>₹20</Text>
+              </View>
+              <View style={styles.fareRow}>
+                <Text style={styles.fareLabel}>Taxes</Text>
+                <Text style={styles.fareValue}>₹12</Text>
+              </View>
+              <View style={styles.fareRowTotal}>
+                <Text style={styles.fareLabelTotal}>Total</Text>
+                <Text style={styles.fareValueTotal}>
+                  ₹{baseFare !== undefined ? baseFare + 20 + 12 : "N/A"}
+                </Text>
+              </View>
+            </View>
+            <Margin margin={30} />
             <View
               style={{
                 flexDirection: "row",
@@ -249,11 +302,59 @@ const RideComplete = () => {
           <CustomButton
             title="Pay ₹162 | Metamask"
             size="medium"
-            onPress={() => navigation.navigate("RideCompleted" as never)}
+            onPress={handlePayment}
             status="primary"
           />
         </View>
       </View>
+
+      {/* Payment Processing Dialog */}
+      <Modal
+        visible={showPaymentDialog}
+        transparent={true}
+        animationType="fade">
+        <View style={styles.modalContainer}>
+          <View style={styles.modalContent}>
+            <Icon
+              name="sync-outline"
+              fill={primaryColor}
+              width={50}
+              height={50}
+              style={styles.spinningIcon}
+            />
+            <Text style={styles.modalText}>Processing Payment...</Text>
+            <Text style={styles.modalSubText}>
+              Please wait while we process your payment
+            </Text>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Success Dialog */}
+      <Modal
+        visible={showSuccessDialog}
+        transparent={true}
+        animationType="fade">
+        <View style={styles.modalContainer}>
+          <View style={styles.modalContent}>
+            <Icon
+              name="checkmark-circle-outline"
+              fill={primaryColor}
+              width={50}
+              height={50}
+            />
+            <Text style={styles.modalText}>Payment Successful!</Text>
+            <Text style={styles.modalSubText}>
+              Your ride has been completed
+            </Text>
+            <TouchableOpacity
+              style={styles.successButton}
+              onPress={handlePaymentSuccess}>
+              <Text style={styles.successButtonText}>Done</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </>
   );
 };
@@ -380,5 +481,96 @@ const styles = StyleSheet.create({
     borderColor: "#fff",
     borderRadius: 6,
     marginTop: 20,
+  },
+  // Modal styles
+  modalContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "rgba(0, 0, 0, 0.7)",
+  },
+  modalContent: {
+    backgroundColor: "#1c2722",
+    borderRadius: 10,
+    padding: 30,
+    alignItems: "center",
+    width: "80%",
+    borderWidth: 1.5,
+    borderColor: primaryColor,
+  },
+  modalText: {
+    fontSize: 18,
+    fontFamily: "Montserrat-Bold",
+    color: "#fff",
+    marginTop: 15,
+  },
+  modalSubText: {
+    fontSize: 14,
+    fontFamily: "Montserrat-Regular",
+    color: "#fff",
+    marginTop: 5,
+    textAlign: "center",
+  },
+  spinningIcon: {
+    transform: [{rotate: "0deg"}],
+  },
+  successButton: {
+    backgroundColor: primaryColor,
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 6,
+    marginTop: 20,
+  },
+  successButtonText: {
+    fontSize: 16,
+    fontFamily: "Montserrat-SemiBold",
+    color: "#fff",
+  },
+  fareCard: {
+    backgroundColor: "#1c2722",
+    borderRadius: 10,
+    padding: 20,
+    borderWidth: 1.5,
+    borderColor: primaryColor,
+  },
+  fareTitle: {
+    fontSize: 18,
+    fontFamily: "Montserrat-Bold",
+    color: primaryColor,
+    marginBottom: 15,
+    textAlign: "center",
+  },
+  fareRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginBottom: 10,
+  },
+  fareRowTotal: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginTop: 10,
+    paddingTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: "#fff",
+  },
+  fareLabel: {
+    fontSize: 16,
+    fontFamily: "Montserrat-Regular",
+    color: "#fff",
+  },
+  fareLabelTotal: {
+    fontSize: 16,
+    fontFamily: "Montserrat-Bold",
+    color: "#fff",
+  },
+  fareValue: {
+    fontSize: 16,
+    fontFamily: "Montserrat-Regular",
+    color: "#fff",
+  },
+  fareValueTotal: {
+    fontSize: 16,
+    fontFamily: "Montserrat-Bold",
+    color: primaryColor,
   },
 });

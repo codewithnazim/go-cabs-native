@@ -3,16 +3,122 @@
 
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Google Maps Embed</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Ride Map</title>
     <script
-        src="https://maps.googleapis.com/maps/api/js?key=AIzaSyD_4Pvt7BDSMnloTzhACsFtvrf_4wPTeMs&libraries=places"></script>
+        src="https://maps.googleapis.com/maps/api/js?key=AIzaSyCFGA0WOSUzALjA-CvKVgklqkO4P-zvvs0&libraries=places"></script>
+    <style>
+        /* Basic styling */
+        html,
+        body {
+            height: 100%;
+            margin: 0;
+            padding: 0;
+            font-family: sans-serif;
+        }
+
+        #map {
+            height: 100%;
+            width: 100%;
+        }
+
+        #info {
+            position: absolute;
+            bottom: 10px;
+            left: 10px;
+            background-color: white;
+            padding: 10px;
+            border-radius: 5px;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+            z-index: 5;
+            /* Ensure it's above the map */
+        }
+    </style>
 </head>
 
-<body style="margin: 0;padding: 0;">
-    <iframe width="100%" height="320px" frameborder="0" style="border:0"
-        src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d248849.90089992387!2d77.46612515235657!3d12.953945613520993!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x3bae1670c9b44e6d%3A0xf8dfc3e8517e4fe0!2sBengaluru%2C%20Karnataka!5e0!3m2!1sen!2sin!4v1738833610749!5m2!1sen!2sin"
-        allowfullscreen></iframe>
+<body>
+    <div id="map"></div>
+    <div id="info">Calculating route...</div>
+
+    <script>
+        let map;
+        const directionsService = new google.maps.DirectionsService();
+        const directionsRenderer = new google.maps.DirectionsRenderer({
+            suppressMarkers: true // We'll add custom markers
+        });
+
+        // --- Static Locations ---
+        const pickupLocation = { lat: 12.9716, lng: 77.5946 }; // Example: Bangalore City Center
+        const destinationLocation = { lat: 12.9279, lng: 77.6271 }; // Example: Koramangala
+
+        function initMap() {
+            map = new google.maps.Map(document.getElementById("map"), {
+                center: pickupLocation, // Center map initially on pickup
+                zoom: 12, // Adjust zoom as needed
+                disableDefaultUI: true, // Hide default controls for a cleaner look
+            });
+
+            directionsRenderer.setMap(map);
+
+            // Add custom markers
+            new google.maps.Marker({
+                position: pickupLocation,
+                map: map,
+                title: "Pickup",
+                // You can use custom icons here
+                // icon: 'path/to/pickup-icon.png'
+            });
+
+            new google.maps.Marker({
+                position: destinationLocation,
+                map: map,
+                title: "Destination",
+                // icon: 'path/to/destination-icon.png'
+            });
+
+            calculateAndDisplayRoute();
+        }
+
+        function calculateAndDisplayRoute() {
+            directionsService.route(
+                {
+                    origin: pickupLocation,
+                    destination: destinationLocation,
+                    travelMode: google.maps.TravelMode.DRIVING,
+                },
+                (response, status) => {
+                    if (status === "OK" && response) {
+                        directionsRenderer.setDirections(response);
+
+                        // Extract distance and duration
+                        const route = response.routes[0];
+                        if (route && route.legs && route.legs[0]) {
+                            const leg = route.legs[0];
+                            const distanceText = leg.distance?.text || 'N/A';
+                            const durationText = leg.duration?.text || 'N/A';
+                            document.getElementById('info').innerText = `Distance: ${distanceText} (${durationText})`;
+
+                            // Adjust map bounds to fit the route
+                            const bounds = new google.maps.LatLngBounds();
+                            bounds.extend(pickupLocation);
+                            bounds.extend(destinationLocation);
+                            map.fitBounds(bounds, { padding: 60 }); // Add padding around the route
+                        } else {
+                            document.getElementById('info').innerText = 'Route details not found.';
+                        }
+
+                    } else {
+                        window.alert("Directions request failed due to " + status);
+                        document.getElementById('info').innerText = 'Could not calculate route.';
+                    }
+                }
+            );
+        }
+
+        // Initialize the map when the window loads
+        window.onload = initMap;
+
+    </script>
 </body>
 
 </html>
