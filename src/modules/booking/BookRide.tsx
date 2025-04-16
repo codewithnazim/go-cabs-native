@@ -44,8 +44,6 @@ const BookRide = () => {
   const [paymentMethod, setPaymentMethod] = useState<number | null>(null);
   const [showDrivers, setShowDrivers] = useState(false);
   const [animatedDrivers, setAnimatedDrivers] = useState<AnimatedDriver[]>([]);
-  const [showPaymentDialog, setShowPaymentDialog] = useState(false);
-  const [showSuccessDialog, setShowSuccessDialog] = useState(false);
 
   // Animation references - using a Map for better tracking by ID
   const animationsMap = useRef(
@@ -60,10 +58,11 @@ const BookRide = () => {
   );
 
   // Function to handle ride type selection
-  const handleRideSelection = (rideName: string) => {
+  const handleRideSelection = (rideName: string, price: number) => {
     setRideState(prev => ({
       ...prev,
       selectedRideType: rideName,
+      fare: {baseFare: price},
     }));
     setIsPayment(true);
   };
@@ -146,21 +145,7 @@ const BookRide = () => {
       return; // Don't proceed if no payment method is selected
     }
 
-    // Show payment dialog only when payment method is selected and button is clicked
-    setShowPaymentDialog(true);
-
-    // Simulate payment processing
-    setTimeout(() => {
-      setShowPaymentDialog(false);
-      setShowSuccessDialog(true);
-    }, 2000);
-  };
-
-  const handlePaymentSuccess = () => {
-    setShowSuccessDialog(false);
-    // Clear any existing animations
-    animationsMap.current.clear();
-
+    // Update ride state to search for drivers without processing payment
     const randomDrivers = getRandomDrivers();
 
     // Create enhanced drivers with animation IDs
@@ -295,9 +280,7 @@ const BookRide = () => {
               <Text style={styles.rating}>★ {driver.rating}</Text>
             </View>
           </View>
-          <Text style={styles.callButtonText}>
-            {driver.bidAmount}
-          </Text>
+          <Text style={styles.callButtonText}>{driver.bidAmount}</Text>
         </TouchableOpacity>
       </Animated.View>
     );
@@ -333,7 +316,22 @@ const BookRide = () => {
                             rideState.selectedRideType === item.name &&
                               styles.selectedRide,
                           ]}
-                          onPress={() => handleRideSelection(item.name)}>
+                          onPress={() => {
+                            const priceString = item.price; // e.g., "₹ 150"
+                            const numericPrice = parseInt(
+                              priceString.replace("₹ ", ""),
+                              10,
+                            ); // Extract number
+                            if (!isNaN(numericPrice)) {
+                              handleRideSelection(item.name, numericPrice);
+                            } else {
+                              console.error(
+                                "Could not parse price:",
+                                priceString,
+                              );
+                              // Handle error case, maybe show default price or alert
+                            }
+                          }}>
                           <CarIcon width={50} height={50} />
                           <View style={{flexGrow: 1}}>
                             <Text style={styles.h1}>{item.name}</Text>
@@ -418,60 +416,15 @@ const BookRide = () => {
                     disabled={paymentMethod === null}
                   />
                 </View>
+                <Text style={styles.paymentNote}>
+                  Payment will be processed at the end of your ride
+                </Text>
               </View>
             </>
           )}
           <Margin margin={10} />
         </View>
       </ScrollView>
-
-      {/* Payment Processing Dialog */}
-      <Modal
-        visible={showPaymentDialog}
-        transparent={true}
-        animationType="fade">
-        <View style={styles.modalContainer}>
-          <View style={styles.modalContent}>
-            <Icon
-              name="sync-outline"
-              fill={primaryColor}
-              width={50}
-              height={50}
-              style={styles.spinningIcon}
-            />
-            <Text style={styles.modalText}>Processing Payment...</Text>
-            <Text style={styles.modalSubText}>
-              Please wait while we process your payment
-            </Text>
-          </View>
-        </View>
-      </Modal>
-
-      {/* Success Dialog */}
-      <Modal
-        visible={showSuccessDialog}
-        transparent={true}
-        animationType="fade">
-        <View style={styles.modalContainer}>
-          <View style={styles.modalContent}>
-            <Icon
-              name="checkmark-circle-outline"
-              fill={primaryColor}
-              width={50}
-              height={50}
-            />
-            <Text style={styles.modalText}>Payment Successful!</Text>
-            <Text style={styles.modalSubText}>
-              Your ride has been confirmed
-            </Text>
-            <TouchableOpacity
-              style={styles.successButton}
-              onPress={handlePaymentSuccess}>
-              <Text style={styles.successButtonText}>Done</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
     </>
   );
 };
@@ -680,6 +633,13 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontFamily: "Montserrat-Bold",
     color: primaryColor,
+  },
+  paymentNote: {
+    color: "#fff",
+    fontSize: 14,
+    fontFamily: "Montserrat-Regular",
+    textAlign: "center",
+    marginTop: 10,
   },
 });
 

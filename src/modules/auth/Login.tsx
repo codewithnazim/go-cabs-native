@@ -16,7 +16,7 @@ import {userAtom} from "../../store/atoms/user/userAtom";
 import {User} from "../../types/user/userTypes";
 import {mmkvUtils} from "../../store/mmkv/storage";
 import {FIREBASE_WEB_CLIENT_ID} from "@env";
-import { RootNavigationProp } from '../../types/navigation/navigation.types';
+import {RootNavigationProp} from "../../types/navigation/navigation.types";
 
 const Login = () => {
   const navigation = useNavigation<RootNavigationProp>();
