@@ -1,6 +1,7 @@
 package com.gocabs
 
 import android.app.Application
+import android.webkit.WebView
 import com.facebook.react.PackageList
 import com.facebook.react.ReactApplication
 import com.facebook.react.ReactHost
@@ -40,6 +41,21 @@ class MainApplication : Application(), ReactApplication {
     if (BuildConfig.IS_NEW_ARCHITECTURE_ENABLED) {
       // If you opted-in for the New Architecture, we load the native entry point for this app.
       load()
+    }
+    
+    // Configure WebView settings
+    WebView.setWebContentsDebuggingEnabled(BuildConfig.DEBUG)
+    
+    // Initialize WebView with proper settings
+    val webView = WebView(applicationContext)
+    webView.settings.apply {
+      allowFileAccess = true
+      allowContentAccess = true
+      allowFileAccessFromFileURLs = true
+      allowUniversalAccessFromFileURLs = true
+      javaScriptEnabled = true
+      domStorageEnabled = true
+      setGeolocationEnabled(true)
     }
   }
 }

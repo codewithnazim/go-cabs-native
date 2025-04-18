@@ -13,7 +13,7 @@ const Home = () => {
     React.useCallback(() => {
       setIsFocused(true);
       return () => setIsFocused(false);
-    }, [])
+    }, []),
   );
 
   useEffect(() => {
@@ -31,9 +31,9 @@ const Home = () => {
             onPress: () => BackHandler.exitApp(),
           },
         ]);
-        return true; 
+        return true;
       }
-      return false; 
+      return false;
     };
 
     // Add event listener for back button press
