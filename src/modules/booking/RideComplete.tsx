@@ -5,8 +5,11 @@ import {
   TouchableOpacity,
   View,
   Modal,
+  Animated,
+  Easing,
+  Dimensions,
 } from "react-native";
-import React, {useState} from "react";
+import React, {useState, useRef, useEffect} from "react";
 import {backgroundPrimary, primaryColor} from "../../theme/colors";
 import WebView from "react-native-webview";
 import CarIcon from "../../../assets/images/icons/car.svg";
@@ -18,9 +21,12 @@ import {Icon, Input} from "@ui-kitten/components";
 import CustomButton from "../../components/CustomButton";
 import {useNavigation} from "@react-navigation/native";
 import SendIcon from "../../../assets/images/icons/sendIcon-white.svg";
-import {useRecoilState } from "recoil";
+import {useRecoilState} from "recoil";
 import {rideAtom} from "../../store/atoms/ride/rideAtom";
 import {RootNavigationProp} from "../../types/navigation/navigation.types";
+import {LinearGradient} from "react-native-linear-gradient";
+
+const {width} = Dimensions.get("window");
 
 const RideComplete = () => {
   const navigation = useNavigation<RootNavigationProp>();
@@ -31,6 +37,69 @@ const RideComplete = () => {
   const driverWalletAddress = rideState.driver?.walletAddress;
   const [showPaymentDialog, setShowPaymentDialog] = useState(false);
   const [showSuccessDialog, setShowSuccessDialog] = useState(false);
+
+  // Animation values
+  const iconScale = useRef(new Animated.Value(1)).current;
+  const glowOpacity = useRef(new Animated.Value(0.4)).current;
+  const shineAnim = useRef(new Animated.Value(-width)).current;
+
+  // Setup animations
+  useEffect(() => {
+    // Icon pulse animation
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(iconScale, {
+          toValue: 1.1,
+          duration: 1500,
+          useNativeDriver: true,
+          easing: Easing.inOut(Easing.ease),
+        }),
+        Animated.timing(iconScale, {
+          toValue: 1,
+          duration: 1500,
+          useNativeDriver: true,
+          easing: Easing.inOut(Easing.ease),
+        }),
+      ]),
+    ).start();
+
+    // Glow animation
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(glowOpacity, {
+          toValue: 0.8,
+          duration: 2000,
+          useNativeDriver: false,
+          easing: Easing.inOut(Easing.ease),
+        }),
+        Animated.timing(glowOpacity, {
+          toValue: 0.4,
+          duration: 2000,
+          useNativeDriver: false,
+          easing: Easing.inOut(Easing.ease),
+        }),
+      ]),
+    ).start();
+
+    // Create shine animation that moves across the component
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(shineAnim, {
+          toValue: width,
+          duration: 2500,
+          useNativeDriver: true,
+          easing: Easing.ease,
+        }),
+        Animated.timing(shineAnim, {
+          toValue: -width,
+          duration: 0,
+          useNativeDriver: true,
+        }),
+        // Add delay between animations
+        Animated.delay(2000),
+      ]),
+    ).start();
+  }, []);
 
   // Function to handle payment processing
   const handlePayment = () => {
@@ -56,7 +125,7 @@ const RideComplete = () => {
   // Function to handle payment success
   const handlePaymentSuccess = () => {
     setShowSuccessDialog(false);
-    navigation.navigate("UserScreens", {screen: "Home" });
+    navigation.navigate("UserScreens", {screen: "Home"});
   };
 
   return (
@@ -71,7 +140,7 @@ const RideComplete = () => {
             }}>
             <WebView
               originWhitelist={["*"]}
-              source={{ uri: 'file:///android_asset/map.html' }}
+              source={{uri: "file:///android_asset/map.html"}}
               style={styles.webview}
             />
           </View>
@@ -209,10 +278,51 @@ const RideComplete = () => {
               </Text>
             </View>
             <Margin margin={40} />
-            <View style={styles.innerCard}>
-              <Text style={[styles.h5, {fontFamily: "Montserrat-SemiBold"}]}>
-                You saved 3 kg of CO₂ emissions on this ride!
-              </Text>
+            <View style={styles.co2CardContainer}>
+              <LinearGradient
+                colors={["#005935", "#00BF72"]}
+                start={{x: 1, y: 0}}
+                end={{x: 0, y: 0}}
+                style={styles.co2Card}>
+                {/* Shine effect overlay */}
+                <Animated.View
+                  style={[
+                    styles.shineEffect,
+                    {
+                      transform: [{translateX: shineAnim}],
+                    },
+                  ]}>
+                  <LinearGradient
+                    colors={[
+                      "rgba(255, 255, 255, 0.0)",
+                      "rgba(255, 255, 255, 0.4)",
+                      "rgba(255, 255, 255, 0.0)",
+                    ]}
+                    start={{x: 0, y: 0}}
+                    end={{x: 1, y: 0}}
+                    style={StyleSheet.absoluteFill}
+                  />
+                </Animated.View>
+                <View style={styles.co2IconContainer}>
+                  <Icon
+                    name="globe-outline"
+                    width={32}
+                    height={32}
+                    fill="#FFFFFF"
+                  />
+                </View>
+                <View style={styles.co2TextContainer}>
+                  <Text style={styles.co2SavedText}>3 kg</Text>
+                  <Text style={styles.co2Text}>
+                    CO₂ emissions saved on this ride!
+                  </Text>
+                </View>
+                <View style={styles.co2BadgeContainer}>
+                  <View style={styles.co2Badge}>
+                    <Text style={styles.co2BadgeText}>ECO</Text>
+                  </View>
+                </View>
+              </LinearGradient>
             </View>
             <Margin margin={30} />
             <View style={styles.fareCard}>
@@ -300,7 +410,9 @@ const RideComplete = () => {
         </ScrollView>
         <View style={styles.bottomBlock}>
           <CustomButton
-            title={`Pay ${baseFare !== undefined ? baseFare + 20 + 12 : "N/A"} | Metamask`}
+            title={`Pay ${
+              baseFare !== undefined ? baseFare + 20 + 12 : "N/A"
+            } | Metamask`}
             size="medium"
             onPress={handlePayment}
             status="primary"
@@ -572,5 +684,70 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontFamily: "Montserrat-Bold",
     color: primaryColor,
+  },
+  // New CO2 emission UI styles
+  co2CardContainer: {
+    borderRadius: 12,
+    overflow: "hidden",
+    shadowColor: "#00bf72",
+    shadowOffset: {
+      width: 0,
+      height: 3,
+    },
+    shadowOpacity: 0.4,
+    shadowRadius: 8,
+    elevation: 10,
+    marginHorizontal: 5, // Add margin to better show the shadow
+  },
+  co2Card: {
+    padding: 20,
+    flexDirection: "row",
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "rgba(229, 229, 229, 0.3)",
+    overflow: "hidden", // Ensure gradient stays within borders
+    borderRadius: 12,
+  },
+  shineEffect: {
+    position: "absolute",
+    top: -20,
+    left: 0,
+    bottom: -20,
+    width: 120,
+    backgroundColor: "transparent",
+    zIndex: 10,
+  },
+  co2IconContainer: {
+    backgroundColor: "rgba(255, 255, 255, 0.2)",
+    padding: 10,
+    borderRadius: 50,
+    marginRight: 15,
+  },
+  co2TextContainer: {
+    flex: 1,
+  },
+  co2SavedText: {
+    fontSize: 22,
+    fontFamily: "Montserrat-ExtraBold",
+    color: "#FFFFFF",
+  },
+  co2Text: {
+    fontSize: 14,
+    fontFamily: "Montserrat-SemiBold",
+    color: "#FFFFFF",
+  },
+  co2BadgeContainer: {
+    alignItems: "flex-end",
+  },
+  co2Badge: {
+    backgroundColor: "rgba(255, 255, 255, 0.9)",
+    borderRadius: 16,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+  },
+  co2BadgeText: {
+    color: "#005231",
+    fontFamily: "Montserrat-ExtraBold",
+    fontSize: 12,
   },
 });
