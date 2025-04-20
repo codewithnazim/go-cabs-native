@@ -31,7 +31,7 @@ const AcceptRide = () => {
             }}>
             <WebView
               originWhitelist={["*"]}
-              source={require("./map.html")}
+              source={{ uri: 'file:///android_asset/map.html' }}
               style={[styles.webview, {height: startRide ? 320 : 320}]}
             />
           </View>

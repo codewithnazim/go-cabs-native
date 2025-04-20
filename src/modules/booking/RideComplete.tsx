@@ -18,7 +18,7 @@ import {Icon, Input} from "@ui-kitten/components";
 import CustomButton from "../../components/CustomButton";
 import {useNavigation} from "@react-navigation/native";
 import SendIcon from "../../../assets/images/icons/sendIcon-white.svg";
-import {useRecoilState, useRecoilValue} from "recoil";
+import {useRecoilState } from "recoil";
 import {rideAtom} from "../../store/atoms/ride/rideAtom";
 import {RootNavigationProp} from "../../types/navigation/navigation.types";
 
@@ -56,7 +56,7 @@ const RideComplete = () => {
   // Function to handle payment success
   const handlePaymentSuccess = () => {
     setShowSuccessDialog(false);
-    navigation.navigate("RideCompleted" as never);
+    navigation.navigate("UserScreens", {screen: "Home" });
   };
 
   return (
@@ -71,7 +71,7 @@ const RideComplete = () => {
             }}>
             <WebView
               originWhitelist={["*"]}
-              source={require("./map.html")}
+              source={{ uri: 'file:///android_asset/map.html' }}
               style={styles.webview}
             />
           </View>
@@ -300,7 +300,7 @@ const RideComplete = () => {
         </ScrollView>
         <View style={styles.bottomBlock}>
           <CustomButton
-            title="Pay ₹162 | Metamask"
+            title={`Pay ${baseFare !== undefined ? baseFare + 20 + 12 : "N/A"} | Metamask`}
             size="medium"
             onPress={handlePayment}
             status="primary"

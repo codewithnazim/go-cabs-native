@@ -1,4 +1,4 @@
-import {TouchableOpacity, View, ActivityIndicator} from "react-native";
+import {TouchableOpacity, View, ActivityIndicator, Alert} from "react-native";
 import React, {useEffect, useState, useCallback, useRef} from "react";
 import {Input, Text} from "@ui-kitten/components";
 import {useNavigation, useFocusEffect} from "@react-navigation/native";
@@ -15,8 +15,9 @@ import {useRecoilState} from "recoil";
 import {userAtom} from "../../store/atoms/user/userAtom";
 import {User} from "../../types/user/userTypes";
 import {mmkvUtils} from "../../store/mmkv/storage";
-import {FIREBASE_WEB_CLIENT_ID} from "@env";
+// import {FIREBASE_WEB_CLIENT_ID} from "@env";
 import {RootNavigationProp} from "../../types/navigation/navigation.types";
+import Config from "react-native-config";
 
 const Login = () => {
   const navigation = useNavigation<RootNavigationProp>();
@@ -26,8 +27,10 @@ const Login = () => {
   const [loading, setLoading] = useState(false);
   const isFirstRender = useRef(true);
 
-  const firebaseWebClientId = FIREBASE_WEB_CLIENT_ID;
-  // console.log("web client", firebaseWebClientId);
+  // const firebaseWebClientId = FIREBASE_WEB_CLIENT_ID;
+  const firebaseWebClientId = Config.FIREBASE_WEB_CLIENT_ID;
+  // const firebaseWebClientId = '1051726678978-go98d67mjjhi39t7326u3gbcpqn6sncb.apps.googleusercontent.com';
+  console.log("web client", firebaseWebClientId, Config.ENVIRONMENT);
   useEffect(() => {
     GoogleSignin.configure({
       webClientId: firebaseWebClientId,

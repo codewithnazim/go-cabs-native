@@ -14,6 +14,22 @@
       },
       "oauth_client": [
         {
+          "client_id": "1051726678978-0bka6rb38an84slaf74otpqo06pc79qv.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.gocabs",
+            "certificate_hash": "5113b11e2647a82caf057ab3fb59cefd7ea2470f"
+          }
+        },
+        {
+          "client_id": "1051726678978-iel21am2itr768232h6297pfvodufaj6.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.gocabs",
+            "certificate_hash": "5e8f16062ea3cd2c4a0d547876baa6f38cabf625"
+          }
+        },
+        {
           "client_id": "1051726678978-go98d67mjjhi39t7326u3gbcpqn6sncb.apps.googleusercontent.com",
           "client_type": 3
         }
@@ -29,6 +45,13 @@
             {
               "client_id": "1051726678978-go98d67mjjhi39t7326u3gbcpqn6sncb.apps.googleusercontent.com",
               "client_type": 3
+            },
+            {
+              "client_id": "1051726678978-24hqnti26dofdn4g4b5bkm5cms4ttbvs.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "org.gocabs.com"
+              }
             }
           ]
         }

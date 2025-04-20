@@ -6,7 +6,6 @@ import {
   TouchableOpacity,
   Animated,
   Dimensions,
-  Modal,
 } from "react-native";
 import React, {useState, useRef} from "react";
 import WebView from "react-native-webview";
@@ -24,7 +23,6 @@ import {rideAtom} from "../../store/atoms/ride/rideAtom";
 import driverData from "../driver/data/driverData.json";
 import {Driver} from "../../types/driver/driverTypes";
 import {useNavigation} from "@react-navigation/native";
-import {Icon} from "@ui-kitten/components";
 
 const {width} = Dimensions.get("window");
 
@@ -221,19 +219,6 @@ const BookRide = () => {
 
     const {translateX, progress, opacity} = animationValues;
 
-    const uniqueFares: Record<string, number> = {};
-
-    const generateRandomFare = (driverId: string) => {
-      if (!uniqueFares[driverId]) {
-        const min = 150;
-        const max = 198;
-        uniqueFares[driverId] = Math.floor(
-          Math.random() * (max - min + 1) + min,
-        );
-      }
-      return uniqueFares[driverId];
-    };
-
     return (
       <Animated.View
         key={driver.animationId}
@@ -298,7 +283,7 @@ const BookRide = () => {
             }}>
             <WebView
               originWhitelist={["*"]}
-              source={require("./map.html")}
+              source={{uri: "file:///android_asset/map.html"}}
               style={styles.webview}
             />
           </View>

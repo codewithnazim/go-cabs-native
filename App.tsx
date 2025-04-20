@@ -9,6 +9,10 @@ import RootNavigator from "./src/routes/RootNavigator";
 import {backgroundPrimary} from "./src/theme/colors";
 import {customMapping} from "./src/theme/customMapping";
 import {RecoilRoot} from "recoil";
+// import EnvDebugger from "./src/components/EnvDebugger";
+
+// Set this to true to show environment variables debugger
+// const SHOW_ENV_DEBUGGER = true;
 
 const App = () => (
   <RecoilRoot>
@@ -18,6 +22,7 @@ const App = () => (
       theme={{...eva.light, ...customTheme}}
       customMapping={customMapping}>
       <SafeAreaView style={styles.container}>
+        {/* {SHOW_ENV_DEBUGGER ? <EnvDebugger /> : <RootNavigator />} */}
         <RootNavigator />
       </SafeAreaView>
     </ApplicationProvider>

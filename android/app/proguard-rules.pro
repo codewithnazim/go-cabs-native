@@ -2,6 +2,7 @@
 -keep public class * extends android.app.Application
 -keep public class com.facebook.react.* { *; }
 -keep class com.facebook.soloader.* { *; }
+-keep class android.webkit.WebView { *; }
 
 # Keep annotations
 -keepattributes *Annotation*
