@@ -6,8 +6,10 @@ import {
   TouchableOpacity,
   Animated,
   Dimensions,
+  Alert,
+  TextInput,
 } from "react-native";
-import React, {useState, useRef} from "react";
+import React, {useState, useRef, useEffect} from "react";
 import WebView from "react-native-webview";
 import {backgroundPrimary, primaryColor} from "../../theme/colors";
 import {Radio, RadioGroup} from "@ui-kitten/components";
@@ -20,9 +22,11 @@ import CustomButton from "../../components/CustomButton";
 import Margin from "../../components/Margin";
 import {useRecoilState} from "recoil";
 import {rideAtom} from "../../store/atoms/ride/rideAtom";
-import driverData from "../driver/data/driverData.json";
 import {Driver} from "../../types/driver/driverTypes";
-import {useNavigation} from "@react-navigation/native";
+import {useNavigation, NavigationProp} from "@react-navigation/native";
+import {useSocket} from "../../hooks/useSocket";
+import {RideRequest} from "../../types/ride/types/ride.types";
+import {BookingStackParamList} from "../../types/navigation/navigation.types";
 
 const {width} = Dimensions.get("window");
 
@@ -34,14 +38,51 @@ interface AnimatedDriver extends Driver {
 }
 
 const BookRide = () => {
-  const navigation = useNavigation();
+  const navigation = useNavigation<NavigationProp<BookingStackParamList>>();
   const [rideState, setRideState] = useRecoilState(rideAtom);
+  const {
+    createRideRequest,
+    currentRideState: socketRideState,
+    isConnected: isSocketConnected,
+  } = useSocket();
+
+  // Effect to handle navigation when ride request is acknowledged and pending bids
+  useEffect(() => {
+    if (socketRideState?.status === "pending_bids") {
+      const {rideId, bidding_room_id, rideDetails} = socketRideState;
+      console.log("[BookRide] Attempting navigation to SearchDriver with:", {
+        rideId,
+        bidding_room_id,
+        rideDetails,
+      });
+      if (rideId && bidding_room_id && rideDetails) {
+        navigation.navigate("SearchDriver", {
+          rideId,
+          biddingRoomId: bidding_room_id,
+          initialRideDetails: rideDetails as RideRequest,
+        });
+      } else {
+        console.error("[BookRide] Missing params for SearchDriver navigation", {
+          rideId,
+          bidding_room_id,
+          rideDetails,
+        });
+      }
+    }
+    if (socketRideState?.status === "error" && socketRideState.errorMessage) {
+      Alert.alert("Ride Request Error", socketRideState.errorMessage);
+    }
+  }, [socketRideState, navigation]);
 
   const [compare, setCompare] = useState(false);
   const [isPayment, setIsPayment] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<number | null>(null);
   const [showDrivers, setShowDrivers] = useState(false);
   const [animatedDrivers, setAnimatedDrivers] = useState<AnimatedDriver[]>([]);
+
+  // State for text inputs
+  const [pickupAddress, setPickupAddress] = useState("");
+  const [dropOffAddress, setDropOffAddress] = useState("");
 
   // Animation references - using a Map for better tracking by ID
   const animationsMap = useRef(
@@ -65,17 +106,18 @@ const BookRide = () => {
     setIsPayment(true);
   };
 
-  // Function to get random drivers
+  // Function to get random drivers - COMMENTED OUT as bids will come via socket
+  /*
   const getRandomDrivers = () => {
-    const driverEntries = Object.entries(driverData);
+    const driverEntries = Object.entries(driverData); // driverData was imported, now removed
     const shuffled = [...driverEntries].sort(() => 0.5 - Math.random());
-    // Limit to 4 drivers as requested
     const selectedDrivers = shuffled.slice(0, 4).map(([id, driver]) => ({
       id,
-      ...driver,
+      ...(driver as object), // Assuming driver is an object, addressing linter hint if driverData was complex
     }));
     return selectedDrivers;
   };
+  */
 
   // Function to handle payment method selection
   const handlePaymentMethodChange = (index: number) => {
@@ -139,14 +181,93 @@ const BookRide = () => {
 
   // Function to handle ride confirmation
   const handleConfirmRide = () => {
-    if (paymentMethod === null) {
-      return; // Don't proceed if no payment method is selected
+    if (!isSocketConnected) {
+      Alert.alert(
+        "Connection Error",
+        "Not connected to the server. Please check your internet connection or try again later.",
+      );
+      return;
     }
 
-    // Update ride state to search for drivers without processing payment
-    const randomDrivers = getRandomDrivers();
+    if (paymentMethod === null) {
+      Alert.alert("Payment Method", "Please select a payment method.");
+      return;
+    }
 
-    // Create enhanced drivers with animation IDs
+    // if (!rideState.pickupLocation || !rideState.dropOffLocation) { // Old validation
+    if (!pickupAddress || !dropOffAddress) {
+      // New validation based on text inputs
+      Alert.alert(
+        "Missing Info",
+        "Pickup and drop-off locations are required.",
+      );
+      return;
+    }
+
+    // Update rideState with entered addresses and placeholder coordinates
+    const updatedPickupLocation = {
+      latitude: "0", // Placeholder
+      longitude: "0", // Placeholder
+      address: pickupAddress,
+    };
+    const updatedDropOffLocation = {
+      latitude: "0", // Placeholder
+      longitude: "0", // Placeholder
+      address: dropOffAddress,
+    };
+
+    setRideState(prev => ({
+      ...prev,
+      pickupLocation: updatedPickupLocation,
+      dropOffLocation: updatedDropOffLocation,
+    }));
+
+    const rideDataForServer: RideRequest = {
+      pickupLocation: {
+        latitude: Number(updatedPickupLocation.latitude),
+        longitude: Number(updatedPickupLocation.longitude),
+        address: updatedPickupLocation.address || "",
+      },
+      dropoffLocation: {
+        latitude: Number(updatedDropOffLocation.latitude),
+        longitude: Number(updatedDropOffLocation.longitude),
+        address: updatedDropOffLocation.address || "",
+      },
+      name: "Rider Name Placeholder",
+      phone: "0000000000",
+      fare: {
+        baseFare: rideState.fare?.baseFare || 0,
+        finalFare: rideState.fare?.finalFare || rideState.fare?.baseFare || 0,
+        breakdown: {
+          baseCost:
+            rideState.fare?.breakdown?.baseCost ||
+            rideState.fare?.baseFare ||
+            0,
+          serviceFee: rideState.fare?.breakdown?.serviceFee || 0,
+          taxes: rideState.fare?.breakdown?.taxes || 0,
+        },
+      },
+      bidAmount: rideState.fare?.baseFare || 0,
+      status: "pending",
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+
+    console.log(
+      "Attempting to create ride request with data:",
+      rideDataForServer,
+    );
+    createRideRequest(rideDataForServer);
+
+    // The UI should now react to changes in socketRideState.status
+    // e.g., 'creating_request', then 'pending_bids' or 'error'
+    // The original logic for showing random local drivers and their animations is bypassed.
+    // Navigation or UI changes to show bids will be handled based on socketRideState.
+    // For example, navigate to SearchDriver screen when status becomes 'pending_bids'
+
+    // Original logic commented out:
+    /*
+    const randomDrivers = getRandomDrivers();
     const enhancedDrivers: AnimatedDriver[] = randomDrivers.map(driver => ({
       ...driver,
       animationId: `driver-${driver.id}-${Date.now()}-${Math.random()
@@ -155,57 +276,18 @@ const BookRide = () => {
       visible: false,
       exiting: false,
     }));
-
     setAnimatedDrivers(enhancedDrivers);
-
     setRideState(prev => ({
       ...prev,
       availableDrivers: randomDrivers,
-      status: "searching",
+      status: "searching", // This status in rideAtom might need to align with socketRideState.status
     }));
-
     setShowDrivers(true);
     setIsPayment(false);
-
-    // Sequentially animate drivers in
     enhancedDrivers.forEach((driver, index) => {
-      // Create animation values for this driver
-      const animationValues = {
-        translateX: new Animated.Value(width),
-        progress: new Animated.Value(0),
-        opacity: new Animated.Value(1),
-      };
-
-      // Store animation values in the map
-      animationsMap.current.set(driver.animationId, animationValues);
-
-      // Schedule driver appearance
-      setTimeout(() => {
-        // Make driver visible
-        setAnimatedDrivers(prev =>
-          prev.map(d =>
-            d.animationId === driver.animationId ? {...d, visible: true} : d,
-          ),
-        );
-
-        // Animate driver entry
-        Animated.timing(animationValues.translateX, {
-          toValue: 0,
-          duration: 500,
-          useNativeDriver: true,
-        }).start();
-
-        // Animate progress bar
-        Animated.timing(animationValues.progress, {
-          toValue: 1,
-          duration: 12000, // 12 seconds as requested
-          useNativeDriver: false,
-        }).start(() => {
-          // When progress completes, start exit animation
-          startExitAnimation(driver.animationId);
-        });
-      }, index * 1500); // 1.5 second gap between each driver
+      // ... animation logic ...
     });
+    */
   };
 
   // Render a single driver item with animations
@@ -248,7 +330,7 @@ const BookRide = () => {
               ...prev,
               driver: driver,
             }));
-            navigation.navigate("BookingDetails" as never);
+            navigation.navigate("BookingDetails");
           }}>
           {/* Driver Avatar */}
           <View style={styles.driverAvatar}>
@@ -275,7 +357,7 @@ const BookRide = () => {
     <>
       <ScrollView>
         <View>
-          <View
+          {/* <View // WebView container commented out
             style={{
               width: "100%",
               height: 320,
@@ -286,7 +368,28 @@ const BookRide = () => {
               source={{uri: "file:///android_asset/map.html"}}
               style={styles.webview}
             />
+          </View> */}
+
+          {/* New TextInput fields for pickup and drop-off */}
+          <View style={styles.locationInputContainer}>
+            <Text style={styles.inputLabel}>Pickup Location</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="Enter pickup address"
+              placeholderTextColor="#888"
+              value={pickupAddress}
+              onChangeText={setPickupAddress}
+            />
+            <Text style={styles.inputLabel}>Drop-off Location</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="Enter drop-off address"
+              placeholderTextColor="#888"
+              value={dropOffAddress}
+              onChangeText={setDropOffAddress}
+            />
           </View>
+
           {!isPayment ? (
             <>
               <DullDivider />
@@ -410,6 +513,11 @@ const BookRide = () => {
           <Margin margin={10} />
         </View>
       </ScrollView>
+      {socketRideState?.status === "creating_request" && (
+        <View style={styles.loadingOverlay}>
+          <Text style={styles.loadingText}>Creating your ride request...</Text>
+        </View>
+      )}
     </>
   );
 };
@@ -625,6 +733,42 @@ const styles = StyleSheet.create({
     fontFamily: "Montserrat-Regular",
     textAlign: "center",
     marginTop: 10,
+  },
+  loadingOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(0,0,0,0.7)",
+    justifyContent: "center",
+    alignItems: "center",
+    zIndex: 10,
+  },
+  loadingText: {
+    color: "#fff",
+    fontSize: 18,
+    fontFamily: "Montserrat-SemiBold",
+    marginTop: 10,
+  },
+  // Styles for new input fields
+  locationInputContainer: {
+    padding: 20,
+    backgroundColor: backgroundPrimary, // Match existing theme
+  },
+  inputLabel: {
+    color: "#fff",
+    fontSize: 16,
+    fontFamily: "Montserrat-SemiBold",
+    marginBottom: 8,
+  },
+  input: {
+    backgroundColor: "#2C3A35", // Darker input background
+    color: "#fff",
+    paddingHorizontal: 15,
+    paddingVertical: 12,
+    borderRadius: 8,
+    fontSize: 16,
+    fontFamily: "Montserrat-Regular",
+    marginBottom: 15, // Space between inputs
+    borderWidth: 1,
+    borderColor: "#4A5C55", // Subtle border
   },
 });
 

@@ -1,81 +1,41 @@
-import {StyleSheet, View, BackHandler, Alert} from "react-native";
-import React, {useState, useCallback, useEffect} from "react";
+import {
+  StyleSheet,
+  View,
+  Text,
+  TouchableOpacity,
+  ScrollView,
+} from "react-native";
+import React, {useState, useEffect} from "react";
+import {useRecoilState} from "recoil";
+import {rideAtom} from "../../store/atoms/ride/rideAtom";
 import HomeBanner from "./components/HomeBanner";
-import SearchDriver from "../booking/SearchDriver";
 import Margin from "../../components/Margin";
-import {useFocusEffect} from "@react-navigation/native";
-import {dummyRideRequest} from "../../data/dummyRideRequest";
 import {useSocket} from "../../hooks/useSocket";
-import {SocketControls} from "../../components/SocketControls";
-import {RideRequest} from "../../types/ride/types/ride.types";
+import {useNavigation, NavigationProp} from "@react-navigation/native";
+import {
+  BookingStackParamList,
+  RootStackParamList,
+} from "../../types/navigation/navigation.types";
 
 const Home = () => {
-  const [isFocused, setIsFocused] = useState(false);
-  const roomId = "room_123";
+  const navigation = useNavigation<NavigationProp<RootStackParamList>>();
+  const [rideState, setRideState] = useRecoilState(rideAtom);
+  const {isConnected} = useSocket();
 
-  const {
-    isConnected,
-    roomStatus,
-    roomMembers,
-    joinRoom,
-    sendRideRequest,
-    keepOneClient,
-    disconnect,
-    getRoomMembers,
-  } = useSocket(roomId);
-
-  useFocusEffect(
-    useCallback(() => {
-      setIsFocused(true);
-      return () => setIsFocused(false);
-    }, []),
-  );
-
-  useEffect(() => {
-    const backAction = () => {
-      if (isFocused) {
-        Alert.alert("Exit App", "Are you sure you want to exit the app?", [
-          {text: "Cancel", style: "cancel"},
-          {text: "Yes", onPress: () => BackHandler.exitApp()},
-        ]);
-        return true;
-      }
-      return false;
-    };
-
-    const backHandler = BackHandler.addEventListener(
-      "hardwareBackPress",
-      backAction,
-    );
-
-    return () => backHandler.remove();
-  }, [isFocused]);
-
-  const handleSendRideRequest = () => {
-    const rideRequestData: RideRequest = {
-      ...dummyRideRequest,
-      status: "pending" as const,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    };
-    sendRideRequest(rideRequestData);
+  const handleGoToBooking = () => {
+    navigation.navigate("BookingRoutes", {screen: "BookRide"});
   };
 
   return (
     <View style={styles.container}>
-      <SearchDriver />
       <Margin margin={30} />
       <HomeBanner />
-      <SocketControls
-        isConnected={isConnected}
-        roomStatus={roomStatus}
-        roomMembers={roomMembers}
-        onJoinRoom={joinRoom}
-        onSendRideRequest={handleSendRideRequest}
-        onKeepOneClient={keepOneClient}
-        onDisconnect={disconnect}
-        onGetRoomMembers={getRoomMembers}
-      />
+
+      <TouchableOpacity
+        onPress={handleGoToBooking}
+        style={styles.bookingButton}>
+        <Text style={styles.bookingButtonText}>Book a New Ride</Text>
+      </TouchableOpacity>
     </View>
   );
 };
@@ -84,6 +44,20 @@ export default Home;
 
 const styles = StyleSheet.create({
   container: {
+    flex: 1,
+    backgroundColor: "#242E2A",
     padding: 20,
+  },
+  bookingButton: {
+    backgroundColor: "#00BF72",
+    padding: 15,
+    borderRadius: 8,
+    alignItems: "center",
+    marginVertical: 20,
+  },
+  bookingButtonText: {
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "bold",
   },
 });

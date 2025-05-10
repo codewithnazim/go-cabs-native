@@ -1,10 +1,11 @@
-import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import {NativeStackNavigationProp} from "@react-navigation/native-stack";
+import {RideRequest} from "../ride/types/ride.types";
 
 export type UserStackParamList = {
   Home: undefined;
   Service: undefined;
   Community: undefined;
-  Profile: { userType: 'User' };
+  Profile: {userType: "User"};
   MatchedDrivers: undefined;
   Logistics: undefined;
   AirportService: undefined;
@@ -15,7 +16,7 @@ export type DriverStackParamList = {
   Home: undefined;
   History: undefined;
   Community: undefined;
-  Profile: { userType: 'Driver' };
+  Profile: {userType: "Driver"};
 };
 
 export type ProfileStackParamList = {
@@ -32,6 +33,17 @@ export type ProfileStackParamList = {
 
 export type BookingStackParamList = {
   BookRide: undefined;
+  SearchDriver: {
+    rideId: string;
+    biddingRoomId: string;
+    initialRideDetails: RideRequest;
+  };
+  TrackRideScreen: {
+    rideId: string;
+    active_ride_room_id: string;
+    selectedDriverInfo: any;
+    rideDetails: RideRequest | undefined;
+  };
   BookingDetails: undefined;
   CallDriver: undefined;
   MessageDriver: undefined;
@@ -56,12 +68,12 @@ export type OnboardingStackParamList = {
 };
 
 export type RootStackParamList = {
-  AuthScreens: { screen: keyof AuthStackParamList };
-  OnboardingScreens: { screen: keyof OnboardingStackParamList };
-  UserScreens: { screen: keyof UserStackParamList };
-  DriverScreens: { screen: keyof DriverStackParamList };
-  ProfileScreens: { screen: keyof ProfileStackParamList };
-  BookingRoutes: { screen: keyof BookingStackParamList };
+  AuthScreens: {screen: keyof AuthStackParamList};
+  OnboardingScreens: {screen: keyof OnboardingStackParamList};
+  UserScreens: {screen: keyof UserStackParamList};
+  DriverScreens: {screen: keyof DriverStackParamList};
+  ProfileScreens: {screen: keyof ProfileStackParamList};
+  BookingRoutes: {screen: keyof BookingStackParamList};
 };
 
 /**
