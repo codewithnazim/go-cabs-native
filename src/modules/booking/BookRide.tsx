@@ -34,12 +34,14 @@ import {BookingStackParamList} from "../../types/navigation/navigation.types";
 import MapView, {Marker, PROVIDER_GOOGLE} from "react-native-maps";
 import MapViewDirections from "react-native-maps-directions";
 import {Dimensions as RNDimensions} from "react-native";
+import Config from "react-native-config";
 
 const {width: screenWidth, height: screenHeight} = RNDimensions.get("window");
 
-// IMPORTANT: Place your Google Maps API key here (ensure Directions API is enabled)
+// IMPORTANT: Ensure GOOGLE_MAPS_API_KEY_BOOKRIDE is set in your .env file
 const GOOGLE_MAPS_API_KEY_BOOKRIDE =
-  "YOUR_GOOGLE_MAPS_API_KEY_WITH_DIRECTIONS_ENABLED";
+  Config.GOOGLE_MAPS_API_KEY_BOOKRIDE ||
+  "YOUR_GOOGLE_MAPS_API_KEY_WITH_DIRECTIONS_ENABLED"; // FIXME: Set GOOGLE_MAPS_API_KEY_BOOKRIDE in your .env file. Ensure the Directions API is enabled for this key in your Google Cloud Console.
 
 // Define the expected structure for selected locations
 interface SelectedLocation {
