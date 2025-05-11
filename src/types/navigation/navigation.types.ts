@@ -1,5 +1,6 @@
 import {NativeStackNavigationProp} from "@react-navigation/native-stack";
 import {RideRequest} from "../ride/types/ride.types";
+import {NavigatorScreenParams} from "@react-navigation/native";
 
 export type UserStackParamList = {
   Home: undefined;
@@ -31,8 +32,24 @@ export type ProfileStackParamList = {
   TermsAndCondition: undefined;
 };
 
+// Define the structure for SelectedLocation, to be used by BookRide params
+// This should ideally be in a more common types file if used elsewhere, but for now, here is fine.
+interface SelectedLocationType {
+  // Renamed to avoid conflict if Home.tsx also defines it
+  address: string;
+  coordinates: {
+    lat: number;
+    lng: number;
+  };
+}
+
 export type BookingStackParamList = {
-  BookRide: undefined;
+  BookRide:
+    | {
+        pickupLocation?: SelectedLocationType; // Added param
+        dropOffLocation?: SelectedLocationType; // Added param
+      }
+    | undefined; // Allow undefined if navigating without params initially, though Home.tsx will always pass them
   SearchDriver: {
     rideId: string;
     biddingRoomId: string;
@@ -73,7 +90,7 @@ export type RootStackParamList = {
   UserScreens: {screen: keyof UserStackParamList};
   DriverScreens: {screen: keyof DriverStackParamList};
   ProfileScreens: {screen: keyof ProfileStackParamList};
-  BookingRoutes: {screen: keyof BookingStackParamList};
+  BookingRoutes: NavigatorScreenParams<BookingStackParamList>;
 };
 
 /**
