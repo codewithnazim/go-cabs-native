@@ -1,110 +1,190 @@
-import {useEffect, useState} from "react";
-import {socketClient} from "../services/socket/broadcast/broadcastSocket";
+import {useEffect, useState, useCallback} from "react";
+import {
+  socketClient,
+  CurrentRideProgress, // Import from broadcastSocket
+  Bid, // Import from broadcastSocket
+  // NewBidData,       // Not directly used in useSocket state, but good to have if needed
+} from "../services/socket/broadcast/broadcastSocket";
 import {RideRequest} from "../types/ride/types/ride.types";
 
-interface RoomStatus {
-  status: string;
-  message: string;
+// Removed local re-declarations of CurrentRideProgress and Bid
+
+// Data for driver location updates
+interface DriverLocationData {
+  location: any;
 }
 
-interface RoomMember {
-  id: string;
-  isCurrentUser: boolean;
-}
+// Define a default initial state for ride progress, similar to socketClient's resetRideProgress
+const initialRideProgressState: CurrentRideProgress = {
+  rideId: undefined,
+  bidding_room_id: undefined,
+  active_ride_room_id: undefined,
+  rideDetails: undefined,
+  bids: new Map<string, Bid>(),
+  selectedDriverInfo: undefined,
+  status: "idle",
+  errorMessage: undefined,
+};
 
-interface RoomMembers {
-  roomId: string;
-  members: RoomMember[];
-  totalMembers: number;
-}
+export const useSocket = () => {
+  const [isConnected, setIsConnected] = useState(() => {
+    const initialStatus = socketClient.getConnectionStatus();
+    console.log("[useSocket] Initial connection status:", initialStatus);
+    return initialStatus.isConnected;
+  });
+  const [socketId, setSocketId] = useState(() => {
+    const initialStatus = socketClient.getConnectionStatus();
+    return initialStatus.socketId;
+  });
+  // currentRideState is now guaranteed to be CurrentRideProgress, not null
+  const [currentRideState, setCurrentRideState] = useState<CurrentRideProgress>(
+    socketClient.getCurrentRideProgress() ?? initialRideProgressState,
+  );
 
-export const useSocket = (roomId: string) => {
-  const [isConnected, setIsConnected] = useState(false);
-  const [roomStatus, setRoomStatus] = useState<RoomStatus | null>(null);
-  const [roomMembers, setRoomMembers] = useState<RoomMembers | null>(null);
-
-  const initializeSocket = () => {
-    socketClient.connect();
-    setIsConnected(socketClient.getConnectionStatus().isConnected);
-  };
+  const [driverLocation, setDriverLocation] = useState<any | null>(null);
 
   useEffect(() => {
-    initializeSocket();
-
     const handleConnect = () => {
+      console.log(
+        "[useSocket] Received 'connect' event. Setting isConnected to true.",
+      );
       setIsConnected(true);
-      setRoomStatus(null);
-      setRoomMembers(null);
+      setSocketId(socketClient.getConnectionStatus().socketId);
     };
 
-    const handleDisconnect = () => {
+    const handleDisconnect = (reason?: string) => {
+      console.log(
+        "[useSocket] Received 'disconnect' event. Reason:",
+        reason,
+        "Setting isConnected to false.",
+      );
       setIsConnected(false);
-      setRoomStatus(null);
-      setRoomMembers(null);
+      setSocketId(null);
+      // socketClient updates its internal state; sync ours.
+      // getCurrentRideProgress can return null, so fallback to initial state.
+      setCurrentRideState(
+        socketClient.getCurrentRideProgress() ?? initialRideProgressState,
+      );
     };
 
-    const handleRoomStatus = (data: RoomStatus) => {
-      setRoomStatus(data);
+    // socketClient's "ride_progress_update" event should always pass a non-null CurrentRideProgress object.
+    const handleRideProgressUpdate = (progress: CurrentRideProgress) => {
+      setCurrentRideState(progress);
     };
 
-    const handleRoomMembers = (data: RoomMembers) => {
-      setRoomMembers(data);
+    const handleDriverLocation = (data: DriverLocationData) => {
+      setDriverLocation(data.location);
     };
 
     socketClient.on("connect", handleConnect);
     socketClient.on("disconnect", handleDisconnect);
-    socketClient.on("room_status", handleRoomStatus);
-    socketClient.on("room_members", handleRoomMembers);
+    socketClient.on("ride_progress_update", handleRideProgressUpdate);
+    socketClient.on("driver_location_updated", handleDriverLocation);
+
+    console.log("[useSocket] useEffect: Subscribed to socket events.");
+
+    // Initial state sync
+    const currentStatusOnMount = socketClient.getConnectionStatus();
+    console.log(
+      "[useSocket] useEffect: Syncing state on mount. Current status:",
+      currentStatusOnMount,
+    );
+    if (currentStatusOnMount.isConnected) {
+      handleConnect(); // Call handleConnect to ensure socketId is also set if already connected
+    } else {
+      // If not connected, ensure our state reflects that accurately from the start
+      setIsConnected(false);
+      setSocketId(null);
+    }
+    // Ensure currentRideState is set on mount with the latest or initial state
+    setCurrentRideState(
+      socketClient.getCurrentRideProgress() ?? initialRideProgressState,
+    );
+
+    // Attempt to connect if not already connected when the hook mounts
+    if (!socketClient.getConnectionStatus().isConnected) {
+      console.log(
+        "[useSocket] useEffect: Not connected on mount, calling socketClient.connect().",
+      );
+      socketClient.connect(); // Directly call the client's connect method
+    }
 
     return () => {
       socketClient.off("connect", handleConnect);
       socketClient.off("disconnect", handleDisconnect);
-      socketClient.off("room_status", handleRoomStatus);
-      socketClient.off("room_members", handleRoomMembers);
+      socketClient.off("ride_progress_update", handleRideProgressUpdate);
+      socketClient.off("driver_location_updated", handleDriverLocation);
     };
   }, []);
 
-  const joinRoom = () => {
-    if (!isConnected) {
-      initializeSocket();
-      setTimeout(() => {
-        if (socketClient.getConnectionStatus().isConnected) {
-          socketClient.joinRoom(roomId);
-        }
-      }, 1000);
-    } else {
-      socketClient.joinRoom(roomId);
-    }
-  };
+  const connect = useCallback(() => {
+    console.log(
+      "[useSocket] connect function called. Attempting socketClient.connect().",
+    );
+    socketClient.connect();
+  }, []);
 
-  const sendRideRequest = (rideRequestData: RideRequest) => {
-    if (!isConnected) return;
-    socketClient.sendRideRequest(rideRequestData);
-  };
-
-  const keepOneClient = () => {
-    const keepClientId = socketClient.getConnectionStatus().socketId;
-    if (keepClientId) {
-      socketClient.keepOneClient(roomId, keepClientId);
-    }
-  };
-
-  const disconnect = () => {
+  const disconnect = useCallback(() => {
+    console.log(
+      "[useSocket] disconnect function called. Attempting socketClient.disconnect().",
+    );
     socketClient.disconnect();
-  };
+  }, []);
 
-  const getRoomMembers = () => {
+  const createRideRequest = useCallback(
+    (rideData: RideRequest) => {
+      console.log(
+        "[useSocket] createRideRequest called. Current connection status:",
+        isConnected,
+      );
+      socketClient.createRideRequest(rideData);
+    },
+    [isConnected],
+  );
+
+  // selectDriver in broadcastSocket.ts takes selectedDriverSocketId (string)
+  // and uses its internal this.currentRideProgress.bidding_room_id
+  const selectDriver = useCallback((selectedDriverSocketId: string) => {
+    socketClient.selectDriver(selectedDriverSocketId);
+  }, []);
+
+  const notifyRideCompleted = useCallback(() => {
+    socketClient.notifyRideCompleted();
+  }, []);
+
+  const getBids = useCallback(() => {
+    // Ensure fallback if getCurrentRideProgress returns null
+    const progress = socketClient.getCurrentRideProgress();
+    return progress ? progress.bids : new Map<string, Bid>();
+  }, []);
+
+  const joinRoom = useCallback((roomId: string) => {
+    socketClient.joinRoom(roomId);
+  }, []);
+
+  const leaveRoom = useCallback((roomId: string) => {
+    socketClient.leaveRoom(roomId);
+  }, []);
+
+  const getRoomMembers = useCallback((roomId: string) => {
     socketClient.getRoomMembers(roomId);
-  };
+  }, []);
 
   return {
     isConnected,
-    roomStatus,
-    roomMembers,
-    joinRoom,
-    sendRideRequest,
-    keepOneClient,
+    socketId,
+    currentRideState, // Now non-nullable CurrentRideProgress
+    driverLocation,
+    connect,
     disconnect,
+    createRideRequest,
+    selectDriver,
+    notifyRideCompleted,
+    getBids,
+    joinRoom,
+    leaveRoom,
     getRoomMembers,
+    subscribe: socketClient.on.bind(socketClient),
+    unsubscribe: socketClient.off.bind(socketClient),
   };
 };

@@ -25,7 +25,7 @@ export interface RideState {
     longitude: string;
     address?: string;
   };
-  dxropLocation?: {
+  dropOffLocation?: {
     latitude: string;
     longitude: string;
     address?: string;

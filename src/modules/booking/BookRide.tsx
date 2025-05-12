@@ -6,8 +6,10 @@ import {
   TouchableOpacity,
   Animated,
   Dimensions,
+  Alert,
+  TextInput,
 } from "react-native";
-import React, {useState, useRef} from "react";
+import React, {useState, useRef, useEffect} from "react";
 import WebView from "react-native-webview";
 import {backgroundPrimary, primaryColor} from "../../theme/colors";
 import {Radio, RadioGroup} from "@ui-kitten/components";
@@ -20,11 +22,35 @@ import CustomButton from "../../components/CustomButton";
 import Margin from "../../components/Margin";
 import {useRecoilState} from "recoil";
 import {rideAtom} from "../../store/atoms/ride/rideAtom";
-import driverData from "../driver/data/driverData.json";
 import {Driver} from "../../types/driver/driverTypes";
-import {useNavigation} from "@react-navigation/native";
+import {
+  useNavigation,
+  NavigationProp,
+  RouteProp,
+} from "@react-navigation/native";
+import {useSocket} from "../../hooks/useSocket";
+import {RideRequest} from "../../types/ride/types/ride.types";
+import {BookingStackParamList} from "../../types/navigation/navigation.types";
+import MapView, {Marker, PROVIDER_GOOGLE} from "react-native-maps";
+import MapViewDirections from "react-native-maps-directions";
+import {Dimensions as RNDimensions} from "react-native";
+import Config from "react-native-config";
 
-const {width} = Dimensions.get("window");
+const {width: screenWidth, height: screenHeight} = RNDimensions.get("window");
+
+// IMPORTANT: Ensure GOOGLE_MAPS_API_KEY_BOOKRIDE is set in your .env file
+const GOOGLE_MAPS_API_KEY_BOOKRIDE =
+  Config.GOOGLE_MAPS_API_KEY_BOOKRIDE ||
+  "YOUR_GOOGLE_MAPS_API_KEY_WITH_DIRECTIONS_ENABLED"; // FIXME: Set GOOGLE_MAPS_API_KEY_BOOKRIDE in your .env file. Ensure the Directions API is enabled for this key in your Google Cloud Console.
+
+// Define the expected structure for selected locations
+interface SelectedLocation {
+  address: string;
+  coordinates: {
+    lat: number;
+    lng: number;
+  };
+}
 
 // Enhanced driver type with animation state
 interface AnimatedDriver extends Driver {
@@ -33,9 +59,57 @@ interface AnimatedDriver extends Driver {
   exiting: boolean;
 }
 
-const BookRide = () => {
-  const navigation = useNavigation();
+// Define prop types for BookRide screen
+type BookRideRouteProp = RouteProp<BookingStackParamList, "BookRide">;
+
+interface BookRideProps {
+  route: BookRideRouteProp;
+  // navigation is already available via useNavigation hook
+}
+
+const BookRide: React.FC<BookRideProps> = ({route}) => {
+  const navigation = useNavigation<NavigationProp<BookingStackParamList>>();
   const [rideState, setRideState] = useRecoilState(rideAtom);
+  const {
+    createRideRequest,
+    currentRideState: socketRideState,
+    isConnected: isSocketConnected,
+  } = useSocket();
+  const mapRef = useRef<MapView>(null);
+
+  // Get pickup and dropOff locations from route params
+  const passedPickupLocation = route.params?.pickupLocation;
+  const passedDropOffLocation = route.params?.dropOffLocation;
+
+  useEffect(() => {
+    // Initialize rideState with passed locations if available
+    if (passedPickupLocation && passedDropOffLocation) {
+      setRideState(prev => ({
+        ...prev,
+        pickupLocation: {
+          latitude: String(passedPickupLocation.coordinates.lat),
+          longitude: String(passedPickupLocation.coordinates.lng),
+          address: passedPickupLocation.address,
+        },
+        dropOffLocation: {
+          latitude: String(passedDropOffLocation.coordinates.lat),
+          longitude: String(passedDropOffLocation.coordinates.lng),
+          address: passedDropOffLocation.address,
+        },
+        selectedRideType: undefined,
+        fare: undefined,
+        payment: undefined,
+      }));
+    } else {
+      // Handle case where locations are not passed (e.g., direct navigation or error)
+      // Maybe show an alert and navigate back, or require user to go back to Home
+      Alert.alert(
+        "Location Error",
+        "Pickup and Dropoff locations not provided. Please go back and select them.",
+        [{text: "OK", onPress: () => navigation.goBack()}],
+      );
+    }
+  }, [passedPickupLocation, passedDropOffLocation, setRideState, navigation]);
 
   const [compare, setCompare] = useState(false);
   const [isPayment, setIsPayment] = useState(false);
@@ -65,17 +139,18 @@ const BookRide = () => {
     setIsPayment(true);
   };
 
-  // Function to get random drivers
+  // Function to get random drivers - COMMENTED OUT as bids will come via socket
+  /*
   const getRandomDrivers = () => {
-    const driverEntries = Object.entries(driverData);
+    const driverEntries = Object.entries(driverData); // driverData was imported, now removed
     const shuffled = [...driverEntries].sort(() => 0.5 - Math.random());
-    // Limit to 4 drivers as requested
     const selectedDrivers = shuffled.slice(0, 4).map(([id, driver]) => ({
       id,
-      ...driver,
+      ...(driver as object), // Assuming driver is an object, addressing linter hint if driverData was complex
     }));
     return selectedDrivers;
   };
+  */
 
   // Function to handle payment method selection
   const handlePaymentMethodChange = (index: number) => {
@@ -111,7 +186,7 @@ const BookRide = () => {
     // Run the exit animation sequence
     Animated.sequence([
       Animated.timing(animationValues.translateX, {
-        toValue: -width,
+        toValue: -screenWidth,
         duration: 500,
         useNativeDriver: true,
       }),
@@ -139,14 +214,83 @@ const BookRide = () => {
 
   // Function to handle ride confirmation
   const handleConfirmRide = () => {
-    if (paymentMethod === null) {
-      return; // Don't proceed if no payment method is selected
+    if (!isSocketConnected) {
+      Alert.alert(
+        "Connection Error",
+        "Not connected to the server. Please check your internet connection or try again later.",
+      );
+      return;
     }
 
-    // Update ride state to search for drivers without processing payment
-    const randomDrivers = getRandomDrivers();
+    if (paymentMethod === null) {
+      Alert.alert("Payment Method", "Please select a payment method.");
+      return;
+    }
 
-    // Create enhanced drivers with animation IDs
+    // Locations are now expected to be in rideState, set by useEffect from route.params
+    if (
+      !rideState.pickupLocation?.address ||
+      !rideState.dropOffLocation?.address ||
+      !rideState.pickupLocation.latitude ||
+      !rideState.pickupLocation.longitude ||
+      !rideState.dropOffLocation.latitude ||
+      !rideState.dropOffLocation.longitude
+    ) {
+      Alert.alert(
+        "Missing Info",
+        "Pickup and drop-off locations are missing or incomplete. Please go back to Home.",
+        [{text: "OK", onPress: () => navigation.goBack()}],
+      );
+      return;
+    }
+
+    // rideState already contains the correct pickup and dropOff locations with lat/lng
+    const rideDataForServer: RideRequest = {
+      pickupLocation: {
+        latitude: Number(rideState.pickupLocation.latitude),
+        longitude: Number(rideState.pickupLocation.longitude),
+        address: rideState.pickupLocation.address || "",
+      },
+      dropoffLocation: {
+        latitude: Number(rideState.dropOffLocation.latitude),
+        longitude: Number(rideState.dropOffLocation.longitude),
+        address: rideState.dropOffLocation.address || "",
+      },
+      name: "Rider Name Placeholder", // Consider getting actual user name
+      phone: "0000000000", // Consider getting actual user phone
+      fare: {
+        baseFare: rideState.fare?.baseFare || 0,
+        finalFare: rideState.fare?.finalFare || rideState.fare?.baseFare || 0,
+        breakdown: {
+          baseCost:
+            rideState.fare?.breakdown?.baseCost ||
+            rideState.fare?.baseFare ||
+            0,
+          serviceFee: rideState.fare?.breakdown?.serviceFee || 0,
+          taxes: rideState.fare?.breakdown?.taxes || 0,
+        },
+      },
+      bidAmount: rideState.fare?.baseFare || 0,
+      status: "pending",
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+
+    console.log(
+      "Attempting to create ride request with data from rideState:",
+      rideDataForServer,
+    );
+    createRideRequest(rideDataForServer);
+
+    // The UI should now react to changes in socketRideState.status
+    // e.g., 'creating_request', then 'pending_bids' or 'error'
+    // The original logic for showing random local drivers and their animations is bypassed.
+    // Navigation or UI changes to show bids will be handled based on socketRideState.
+    // For example, navigate to SearchDriver screen when status becomes 'pending_bids'
+
+    // Original logic commented out:
+    /*
+    const randomDrivers = getRandomDrivers();
     const enhancedDrivers: AnimatedDriver[] = randomDrivers.map(driver => ({
       ...driver,
       animationId: `driver-${driver.id}-${Date.now()}-${Math.random()
@@ -155,57 +299,18 @@ const BookRide = () => {
       visible: false,
       exiting: false,
     }));
-
     setAnimatedDrivers(enhancedDrivers);
-
     setRideState(prev => ({
       ...prev,
       availableDrivers: randomDrivers,
-      status: "searching",
+      status: "searching", // This status in rideAtom might need to align with socketRideState.status
     }));
-
     setShowDrivers(true);
     setIsPayment(false);
-
-    // Sequentially animate drivers in
     enhancedDrivers.forEach((driver, index) => {
-      // Create animation values for this driver
-      const animationValues = {
-        translateX: new Animated.Value(width),
-        progress: new Animated.Value(0),
-        opacity: new Animated.Value(1),
-      };
-
-      // Store animation values in the map
-      animationsMap.current.set(driver.animationId, animationValues);
-
-      // Schedule driver appearance
-      setTimeout(() => {
-        // Make driver visible
-        setAnimatedDrivers(prev =>
-          prev.map(d =>
-            d.animationId === driver.animationId ? {...d, visible: true} : d,
-          ),
-        );
-
-        // Animate driver entry
-        Animated.timing(animationValues.translateX, {
-          toValue: 0,
-          duration: 500,
-          useNativeDriver: true,
-        }).start();
-
-        // Animate progress bar
-        Animated.timing(animationValues.progress, {
-          toValue: 1,
-          duration: 12000, // 12 seconds as requested
-          useNativeDriver: false,
-        }).start(() => {
-          // When progress completes, start exit animation
-          startExitAnimation(driver.animationId);
-        });
-      }, index * 1500); // 1.5 second gap between each driver
+      // ... animation logic ...
     });
+    */
   };
 
   // Render a single driver item with animations
@@ -248,7 +353,7 @@ const BookRide = () => {
               ...prev,
               driver: driver,
             }));
-            navigation.navigate("BookingDetails" as never);
+            navigation.navigate("BookingDetails");
           }}>
           {/* Driver Avatar */}
           <View style={styles.driverAvatar}>
@@ -271,22 +376,114 @@ const BookRide = () => {
     );
   };
 
+  // Check if locations were successfully passed and set in rideState
+  // If not, render a message or redirect, rather than the full UI without locations.
+  if (
+    !rideState.pickupLocation?.address ||
+    !rideState.dropOffLocation?.address ||
+    !passedPickupLocation ||
+    !passedDropOffLocation
+  ) {
+    return (
+      <View style={styles.containerAlteredForMessage}>
+        <Text style={styles.headerText}>Loading Location Details...</Text>
+        <Text style={styles.messageText}>
+          If this persists, please go back and re-select locations on the Home
+          screen.
+        </Text>
+        <TouchableOpacity
+          onPress={() => navigation.goBack()}
+          style={styles.goBackButton}>
+          <Text style={styles.goBackButtonText}>Go Back</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
+  // Destructure for easier use in MapViewDirections after null check above
+  const finalPickupCoords = passedPickupLocation.coordinates;
+  const finalDropOffCoords = passedDropOffLocation.coordinates;
+
   return (
-    <>
-      <ScrollView>
-        <View>
-          <View
-            style={{
-              width: "100%",
-              height: 320,
-              backgroundColor: backgroundPrimary,
+    <ScrollView
+      style={styles.mainScrollContainer}
+      contentContainerStyle={styles.scrollContentContainer}>
+      <View style={styles.container}>
+        <View style={styles.locationSummaryContainer}>
+          <Text style={styles.locationSummaryText}>
+            Pickup: {rideState.pickupLocation.address}
+          </Text>
+          <Text style={styles.locationSummaryText}>
+            Drop-off: {rideState.dropOffLocation.address}
+          </Text>
+        </View>
+
+        <View style={styles.mapContainer}>
+          <MapView
+            ref={mapRef}
+            provider={PROVIDER_GOOGLE}
+            style={styles.map}
+            initialRegion={{
+              latitude: finalPickupCoords.lat,
+              longitude: finalPickupCoords.lng,
+              latitudeDelta: 0.0922,
+              longitudeDelta: 0.0421,
             }}>
-            <WebView
-              originWhitelist={["*"]}
-              source={{uri: "file:///android_asset/map.html"}}
-              style={styles.webview}
+            <Marker
+              coordinate={{
+                latitude: finalPickupCoords.lat,
+                longitude: finalPickupCoords.lng,
+              }}
+              title="Pickup Location"
+              description={rideState.pickupLocation.address}
+              pinColor="green"
             />
-          </View>
+            <Marker
+              coordinate={{
+                latitude: finalDropOffCoords.lat,
+                longitude: finalDropOffCoords.lng,
+              }}
+              title="Drop-off Location"
+              description={rideState.dropOffLocation.address}
+              pinColor="red"
+            />
+            {GOOGLE_MAPS_API_KEY_BOOKRIDE !==
+              "YOUR_GOOGLE_MAPS_API_KEY_WITH_DIRECTIONS_ENABLED" && (
+              <MapViewDirections
+                origin={{
+                  latitude: finalPickupCoords.lat,
+                  longitude: finalPickupCoords.lng,
+                }}
+                destination={{
+                  latitude: finalDropOffCoords.lat,
+                  longitude: finalDropOffCoords.lng,
+                }}
+                apikey={GOOGLE_MAPS_API_KEY_BOOKRIDE}
+                strokeWidth={4}
+                strokeColor="#007AFF"
+                mode="DRIVING"
+                onReady={result => {
+                  mapRef.current?.fitToCoordinates(result.coordinates, {
+                    edgePadding: {
+                      right: screenWidth / 20,
+                      bottom: screenHeight / 20,
+                      left: screenWidth / 20,
+                      top: screenHeight / 20,
+                    },
+                  });
+                }}
+                onError={errorMessage => {
+                  console.error(
+                    "MapViewDirections Error (BookRide): ",
+                    errorMessage,
+                  );
+                }}
+              />
+            )}
+          </MapView>
+        </View>
+
+        <View style={styles.tabContainer}>
           {!isPayment ? (
             <>
               <DullDivider />
@@ -302,11 +499,11 @@ const BookRide = () => {
                               styles.selectedRide,
                           ]}
                           onPress={() => {
-                            const priceString = item.price; // e.g., "₹ 150"
+                            const priceString = item.price;
                             const numericPrice = parseInt(
                               priceString.replace("₹ ", ""),
                               10,
-                            ); // Extract number
+                            );
                             if (!isNaN(numericPrice)) {
                               handleRideSelection(item.name, numericPrice);
                             } else {
@@ -314,7 +511,6 @@ const BookRide = () => {
                                 "Could not parse price:",
                                 priceString,
                               );
-                              // Handle error case, maybe show default price or alert
                             }
                           }}>
                           <CarIcon width={50} height={50} />
@@ -407,10 +603,14 @@ const BookRide = () => {
               </View>
             </>
           )}
-          <Margin margin={10} />
         </View>
-      </ScrollView>
-    </>
+      </View>
+      {socketRideState?.status === "creating_request" && (
+        <View style={styles.loadingOverlay}>
+          <Text style={styles.loadingText}>Creating your ride request...</Text>
+        </View>
+      )}
+    </ScrollView>
   );
 };
 
@@ -422,6 +622,13 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: primaryColor,
     borderRadius: 8,
+  },
+  headerText: {
+    fontSize: 22,
+    fontFamily: "Montserrat-Bold",
+    color: "#fff",
+    textAlign: "center",
+    marginBottom: 20,
   },
   progressBar: {
     position: "absolute",
@@ -456,7 +663,7 @@ const styles = StyleSheet.create({
   },
   driverDetails: {
     flex: 1,
-    marginLeft: 15, // Space between avatar and details
+    marginLeft: 15,
   },
   h1: {
     fontSize: 18,
@@ -625,6 +832,84 @@ const styles = StyleSheet.create({
     fontFamily: "Montserrat-Regular",
     textAlign: "center",
     marginTop: 10,
+  },
+  loadingOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(0,0,0,0.7)",
+    justifyContent: "center",
+    alignItems: "center",
+    zIndex: 10,
+  },
+  loadingText: {
+    color: "#fff",
+    fontSize: 18,
+    fontFamily: "Montserrat-SemiBold",
+    marginTop: 10,
+  },
+  mainScrollContainer: {
+    flex: 1,
+    backgroundColor: backgroundPrimary,
+  },
+  scrollContentContainer: {
+    flexGrow: 1,
+  },
+  container: {
+    flex: 1,
+    padding: 15,
+    backgroundColor: backgroundPrimary,
+  },
+  locationSummaryContainer: {
+    padding: 15,
+    backgroundColor: "#353f3b", // A slightly different background for emphasis
+    borderRadius: 8,
+    marginBottom: 20,
+  },
+  locationSummaryText: {
+    color: "#fff",
+    fontSize: 16,
+    fontFamily: "Montserrat-Regular",
+    marginBottom: 5,
+  },
+  containerAlteredForMessage: {
+    // Styles for the message view if locations aren't ready
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 20,
+    backgroundColor: backgroundPrimary,
+  },
+  messageText: {
+    color: "#ccc",
+    fontSize: 16,
+    textAlign: "center",
+    fontFamily: "Montserrat-Regular",
+    marginBottom: 20,
+  },
+  goBackButton: {
+    backgroundColor: primaryColor,
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 8,
+  },
+  goBackButtonText: {
+    color: "#fff",
+    fontSize: 16,
+    fontFamily: "Montserrat-SemiBold",
+  },
+  tabContainer: {
+    flex: 1,
+  },
+  mapContainer: {
+    height: screenHeight * 0.3, // Or a fixed height like 250 or 300
+    width: "100%",
+    borderRadius: 10,
+    overflow: "hidden",
+    marginVertical: 20,
+    borderWidth: 1,
+    borderColor: "#444",
+  },
+  map: {
+    ...StyleSheet.absoluteFillObject,
   },
 });
 

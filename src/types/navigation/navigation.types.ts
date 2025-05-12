@@ -1,10 +1,12 @@
-import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import {NativeStackNavigationProp} from "@react-navigation/native-stack";
+import {RideRequest} from "../ride/types/ride.types";
+import {NavigatorScreenParams} from "@react-navigation/native";
 
 export type UserStackParamList = {
   Home: undefined;
   Service: undefined;
   Community: undefined;
-  Profile: { userType: 'User' };
+  Profile: {userType: "User"};
   MatchedDrivers: undefined;
   Logistics: undefined;
   AirportService: undefined;
@@ -15,7 +17,7 @@ export type DriverStackParamList = {
   Home: undefined;
   History: undefined;
   Community: undefined;
-  Profile: { userType: 'Driver' };
+  Profile: {userType: "Driver"};
 };
 
 export type ProfileStackParamList = {
@@ -30,8 +32,35 @@ export type ProfileStackParamList = {
   TermsAndCondition: undefined;
 };
 
+// Define the structure for SelectedLocation, to be used by BookRide params
+// This should ideally be in a more common types file if used elsewhere, but for now, here is fine.
+interface SelectedLocationType {
+  // Renamed to avoid conflict if Home.tsx also defines it
+  address: string;
+  coordinates: {
+    lat: number;
+    lng: number;
+  };
+}
+
 export type BookingStackParamList = {
-  BookRide: undefined;
+  BookRide:
+    | {
+        pickupLocation?: SelectedLocationType; // Added param
+        dropOffLocation?: SelectedLocationType; // Added param
+      }
+    | undefined; // Allow undefined if navigating without params initially, though Home.tsx will always pass them
+  SearchDriver: {
+    rideId: string;
+    biddingRoomId: string;
+    initialRideDetails: RideRequest;
+  };
+  TrackRideScreen: {
+    rideId: string;
+    active_ride_room_id: string;
+    selectedDriverInfo: any;
+    rideDetails: RideRequest | undefined;
+  };
   BookingDetails: undefined;
   CallDriver: undefined;
   MessageDriver: undefined;
@@ -56,12 +85,12 @@ export type OnboardingStackParamList = {
 };
 
 export type RootStackParamList = {
-  AuthScreens: { screen: keyof AuthStackParamList };
-  OnboardingScreens: { screen: keyof OnboardingStackParamList };
-  UserScreens: { screen: keyof UserStackParamList };
-  DriverScreens: { screen: keyof DriverStackParamList };
-  ProfileScreens: { screen: keyof ProfileStackParamList };
-  BookingRoutes: { screen: keyof BookingStackParamList };
+  AuthScreens: {screen: keyof AuthStackParamList};
+  OnboardingScreens: {screen: keyof OnboardingStackParamList};
+  UserScreens: {screen: keyof UserStackParamList};
+  DriverScreens: {screen: keyof DriverStackParamList};
+  ProfileScreens: {screen: keyof ProfileStackParamList};
+  BookingRoutes: NavigatorScreenParams<BookingStackParamList>;
 };
 
 /**
