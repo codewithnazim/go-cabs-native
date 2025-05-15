@@ -68,7 +68,7 @@ const ViewBidsScreen: React.FC<ViewBidsScreenProps> = ({route}) => {
             driverName: socketBid.driverInfo?.name || "N/A",
             driverRating: socketBid.driverInfo?.rating || 0,
             vehicleDetails: socketBid.driverInfo?.vehicle || "N/A",
-            bidAmount: socketBid.bidAmount || 0,
+            bidAmount: socketBid.bidDetails?.amount || 0,
             currency: socketBid.bidDetails?.currency || "USD",
             estimatedArrivalTime: socketBid.bidDetails?.eta || "N/A",
             bidAt: socketBid.bidDetails?.timestamp || new Date().toISOString(),
@@ -87,12 +87,13 @@ const ViewBidsScreen: React.FC<ViewBidsScreenProps> = ({route}) => {
     if (currentRideState?.rideId === quotationId) {
       if (
         currentRideState.status === "confirmed_in_progress" &&
-        currentRideState.selectedDriverInfo
+        currentRideState.selectedDriverInfo &&
+        currentRideState.acceptedBidDetails
       ) {
-        // Find the accepted bid to pass its details
-        const acceptedBid = bids.find(
-          bid => bid.id === currentRideState.selectedDriverInfo?.id,
-        ); // bid.id is driverSocketId
+        // const driverSocketId = currentRideState.selectedDriverInfo.id;
+        // const acceptedSocketBid = currentRideState.bids.get(driverSocketId);
+
+        // console.log("[ViewBidsScreen] currentRideState for TrackRideScreen:", JSON.stringify(currentRideState)); // Removed for cleanup
 
         Alert.alert(
           "Bid Accepted!",
@@ -102,9 +103,10 @@ const ViewBidsScreen: React.FC<ViewBidsScreenProps> = ({route}) => {
           rideId: quotationId,
           active_ride_room_id: currentRideState.active_ride_room_id || "",
           selectedDriverInfo: currentRideState.selectedDriverInfo,
-          rideDetails: currentRideState.requestDetails, // Original quotation
-          acceptedAmount: acceptedBid?.bidAmount || 0, // Pass accepted bid amount
-          acceptedCurrency: acceptedBid?.currency || "USD", // Pass accepted bid currency
+          rideDetails: currentRideState.requestDetails,
+          acceptedAmount: currentRideState.acceptedBidDetails.amount || 0,
+          acceptedCurrency:
+            currentRideState.acceptedBidDetails.currency || "USD",
         });
       } else if (currentRideState.status === "error") {
         Alert.alert(
@@ -119,7 +121,7 @@ const ViewBidsScreen: React.FC<ViewBidsScreenProps> = ({route}) => {
       }
       // No specific navigation for 'pending_bids' here as the screen itself handles this state.
     }
-  }, [currentRideState, quotationId, navigation, bids]);
+  }, [currentRideState, quotationId, navigation]);
 
   const handleAcceptBid = (bid: Bid) => {
     if (!isConnected) {

@@ -48,7 +48,7 @@ const TrackRideScreen = () => {
       return;
     }
 
-    console.log("TrackRideScreen mounted with params:", route.params);
+    // console.log("TrackRideScreen mounted with params:", route.params); // Removed for cleanup
 
     // Validate that we're tracking the correct ride
     if (

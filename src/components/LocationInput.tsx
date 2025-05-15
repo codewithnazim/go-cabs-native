@@ -16,6 +16,7 @@ interface LocationInputProps {
   isActive?: boolean;
   onFocus?: () => void;
   onBlur?: () => void;
+  mapboxAccessToken: string;
 }
 
 interface Location {
@@ -29,6 +30,10 @@ interface Location {
 interface Prediction {
   description: string;
   place_id: string;
+  mapbox_id?: string;
+  text?: string;
+  place_name?: string;
+  center?: [number, number];
 }
 
 const LocationInput: React.FC<LocationInputProps> = ({
@@ -38,53 +43,81 @@ const LocationInput: React.FC<LocationInputProps> = ({
   isActive,
   onFocus,
   onBlur,
+  mapboxAccessToken,
 }) => {
   const [searchText, setSearchText] = useState(value || "");
   const [predictions, setPredictions] = useState<Prediction[]>([]);
 
   const searchPlaces = async (text: string) => {
+    if (!mapboxAccessToken) {
+      console.error("LocationInput: Mapbox Access Token is missing!");
+      setPredictions([]);
+      return;
+    }
     if (text.length < 2) {
       setPredictions([]);
       return;
     }
 
+    const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(
+      text,
+    )}.json?access_token=${mapboxAccessToken}&autocomplete=true&limit=5`;
+
     try {
-      const response = await fetch(
-        `https://maps.googleapis.com/maps/api/place/autocomplete/json?input=${encodeURIComponent(
-          text,
-        )}&key=AIzaSyD_4Pvt7BDSMnloTzhACsFtvrf_4wPTeMs`,
-      );
-      const data = await response.json();
-      if (data.predictions) {
-        setPredictions(data.predictions);
+      const response = await fetch(url);
+      const responseText = await response.text();
+
+      if (!response.ok) {
+        console.error(
+          `LocationInput: Mapbox API Error - Status: ${response.status}`,
+          responseText,
+        );
+        setPredictions([]);
+        return;
+      }
+
+      const data = JSON.parse(responseText);
+
+      if (data.features) {
+        const mappedPredictions = data.features.map((feature: any) => ({
+          description: feature.place_name,
+          place_id: feature.id,
+          mapbox_id: feature.id,
+          text: feature.text,
+          place_name: feature.place_name,
+          center: feature.center,
+        }));
+        setPredictions(mappedPredictions);
+      } else {
+        setPredictions([]);
       }
     } catch (error) {
-      console.error("Error fetching predictions:", error);
+      console.error(
+        "LocationInput: Error fetching or parsing Mapbox predictions:",
+        error,
+      );
       setPredictions([]);
     }
   };
 
-  const getPlaceDetails = async (placeId: string) => {
-    try {
-      const response = await fetch(
-        `https://maps.googleapis.com/maps/api/place/details/json?place_id=${placeId}&fields=geometry&key=AIzaSyD_4Pvt7BDSMnloTzhACsFtvrf_4wPTeMs`,
-      );
-      const data = await response.json();
-      return data.result;
-    } catch (error) {
-      console.error("Error fetching place details:", error);
-      return null;
-    }
-  };
-
   const handleSelectPlace = async (prediction: Prediction) => {
-    const details = await getPlaceDetails(prediction.place_id);
-    setSearchText(prediction.description);
+    setSearchText(prediction.place_name || prediction.description);
     setPredictions([]);
-    onLocationSelect({
-      address: prediction.description,
-      coordinates: details?.geometry?.location,
-    });
+    if (prediction.center) {
+      onLocationSelect({
+        address: prediction.place_name || prediction.description,
+        coordinates: {
+          lng: prediction.center[0],
+          lat: prediction.center[1],
+        },
+      });
+    } else {
+      console.warn("Selected place does not have coordinates:", prediction);
+      onLocationSelect({
+        address: prediction.place_name || prediction.description,
+        coordinates: {lat: 0, lng: 0},
+      });
+    }
   };
 
   useEffect(() => {
@@ -121,10 +154,12 @@ const LocationInput: React.FC<LocationInputProps> = ({
           nestedScrollEnabled={true}>
           {predictions.map(item => (
             <TouchableOpacity
-              key={item.place_id}
+              key={item.mapbox_id || item.place_id}
               style={styles.row}
               onPress={() => handleSelectPlace(item)}>
-              <Text style={styles.predictionText}>{item.description}</Text>
+              <Text style={styles.predictionText}>
+                {item.place_name || item.description}
+              </Text>
             </TouchableOpacity>
           ))}
         </ScrollView>
