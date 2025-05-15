@@ -23,13 +23,22 @@ export interface NewBidData extends Bid {
   bidding_room_id: string;
 }
 
+// Let's define BidDetails here if not already globally available
+// This should match the structure of data.bidDetails from 'ride_confirmed_to_rider'
+interface BidDetails {
+  amount: number;
+  currency: string;
+  eta?: string; // Optional based on server data
+  timestamp?: string; // Optional based on server data
+}
+
 export interface CurrentRideProgress {
   rideId?: string;
   bidding_room_id?: string;
   active_ride_room_id?: string;
   requestDetails?: RideRequest | QuotationRequestPayload;
   bids: Map<string, Bid>; // driverSocketId -> Bid object
-  selectedDriverInfo?: any;
+  selectedDriverInfo?: any; // Consider typing this as DriverClientData from server types
   status:
     | "idle"
     | "creating_request"
@@ -41,6 +50,7 @@ export interface CurrentRideProgress {
     | "cancelled"
     | "error";
   errorMessage?: string;
+  acceptedBidDetails?: BidDetails; // Added field for accepted bid details
 }
 
 class SocketClient {
@@ -188,7 +198,9 @@ class SocketClient {
 
     // --- New Event Listeners for Rider Flow ---
     this.socket.on("ride_request_created_ack", data => {
-      // data: { rideId, bidding_room_id, rideDetails }
+      console.log(
+        "[BroadcastSocket] Event: 'ride_request_created_ack'. Received.",
+      );
       if (
         this.currentRideProgress &&
         (this.currentRideProgress.status === "creating_request" ||
@@ -207,7 +219,7 @@ class SocketClient {
     });
 
     this.socket.on("ride_request_error", data => {
-      // data: { message, error }
+      console.log("[BroadcastSocket] Event: 'ride_request_error'. Received.");
       if (
         this.currentRideProgress &&
         (this.currentRideProgress.status === "creating_request" ||
@@ -224,7 +236,9 @@ class SocketClient {
     // Specific ack for quotation request, if backend sends a different event
     // Otherwise, the generic ride_request_created_ack might be sufficient if backend adapts
     this.socket.on("quotation_request_created_ack", data => {
-      // data: { quotationId, bidding_room_id, quotationDetails }
+      console.log(
+        "[BroadcastSocket] Event: 'quotation_request_created_ack'. Received.",
+      );
       if (
         this.currentRideProgress &&
         this.currentRideProgress.status === "creating_quotation_request"
@@ -242,6 +256,9 @@ class SocketClient {
     });
 
     this.socket.on("quotation_request_error", data => {
+      console.log(
+        "[BroadcastSocket] Event: 'quotation_request_error'. Received.",
+      );
       if (
         this.currentRideProgress &&
         this.currentRideProgress.status === "creating_quotation_request"
@@ -255,7 +272,9 @@ class SocketClient {
     });
 
     this.socket.on("new_bid_for_your_ride", (data: NewBidData) => {
-      // data is now correctly typed as NewBidData
+      console.log(
+        "[BroadcastSocket] Event: 'new_bid_for_your_ride'. Received.",
+      );
       if (
         this.currentRideProgress &&
         this.currentRideProgress.rideId === data.rideId
@@ -285,6 +304,9 @@ class SocketClient {
     this.socket.on(
       "driver_bid_withdrawn_due_to_disconnect",
       (data: {rideId: string; driverSocketId: string}) => {
+        console.log(
+          "[BroadcastSocket] Event: 'driver_bid_withdrawn_due_to_disconnect'. Received.",
+        );
         if (
           this.currentRideProgress &&
           this.currentRideProgress.rideId === data.rideId
@@ -299,7 +321,7 @@ class SocketClient {
     );
 
     this.socket.on("selection_error", data => {
-      // data: { message }
+      console.log("[BroadcastSocket] Event: 'selection_error'. Received.");
       if (
         this.currentRideProgress &&
         this.currentRideProgress.status === "driver_selection_pending"
@@ -312,33 +334,61 @@ class SocketClient {
       this.triggerEvent("selection_error", data);
     });
 
-    this.socket.on("ride_confirmed_to_rider", data => {
-      // data: { active_ride_room_id, rideId, rideDetails, driverInfo, bidDetails }
-      if (
-        this.currentRideProgress &&
-        this.currentRideProgress.rideId === data.rideId
-      ) {
-        this.currentRideProgress.active_ride_room_id = data.active_ride_room_id;
-        this.currentRideProgress.selectedDriverInfo = data.driverInfo;
-        // rideDetails should already be there, but can update if server sends a modified version
-        this.currentRideProgress.requestDetails = data.rideDetails;
-        this.currentRideProgress.status = "confirmed_in_progress";
-        this.currentRideProgress.errorMessage = undefined;
-        this.joinRoom(data.active_ride_room_id); // Automatically join the active ride room
+    this.socket.on(
+      "ride_confirmed_to_rider",
+      (data: {
+        active_ride_room_id: string;
+        rideId: string;
+        rideDetails: QuotationRequestPayload;
+        driverInfo: any; // Should ideally be a defined type like DriverClientData
+        bidDetails: BidDetails;
+      }) => {
+        console.log(
+          "[BroadcastSocket] Event: 'ride_confirmed_to_rider'. Received.",
+        );
+        if (!this.currentRideProgress) {
+          this.resetRideProgress(
+            "error",
+            "currentRideProgress was unexpectedly null",
+          );
+          // Early return or throw error if this state is critical and unexpected
+          if (!this.currentRideProgress) return; // Guard against resetRideProgress failing (highly unlikely)
+        }
+
+        this.currentRideProgress = {
+          ...this.currentRideProgress,
+          status: "confirmed_in_progress",
+          rideId: data.rideId,
+          active_ride_room_id: data.active_ride_room_id,
+          requestDetails: data.rideDetails,
+          selectedDriverInfo: data.driverInfo
+            ? {
+                // Check if driverInfo exists
+                id: data.driverInfo.id,
+                name: data.driverInfo.name,
+                vehicle: data.driverInfo.vehicle,
+                rating: data.driverInfo.rating,
+                fcmToken: data.driverInfo.fcmToken, // If fcmToken can be undefined, this is fine.
+                // If driverInfo itself can be null, already handled.
+              }
+            : undefined, // Set to undefined if driverInfo is not present
+          bids: this.currentRideProgress.bids, // bids map is initialized in resetRideProgress
+          acceptedBidDetails: data.bidDetails,
+        };
         this.triggerEvent("ride_progress_update", this.currentRideProgress);
-      }
-      this.triggerEvent("ride_confirmed_to_rider", data);
-    });
+        this.triggerEvent("ride_confirmed_to_rider", data);
+      },
+    );
 
     this.socket.on("driver_location_updated", data => {
-      // data: { location }
-      // UI would subscribe to this event directly via on("driver_location_updated", ...)
-      // No specific state change here in socket client itself, but UI needs it.
+      console.log(
+        "[BroadcastSocket] Event: 'driver_location_updated'. Received.",
+      );
       this.triggerEvent("driver_location_updated", data);
     });
 
     this.socket.on("ride_finalized", data => {
-      // data: { rideId, status: "completed" }
+      console.log("[BroadcastSocket] Event: 'ride_finalized'. Received.");
       if (
         this.currentRideProgress &&
         this.currentRideProgress.rideId === data.rideId
@@ -355,7 +405,9 @@ class SocketClient {
     });
 
     this.socket.on("ride_request_cancelled_by_rider", data => {
-      // data: { rideId, bidding_room_id }
+      console.log(
+        "[BroadcastSocket] Event: 'ride_request_cancelled_by_rider'. Received.",
+      );
       if (
         this.currentRideProgress &&
         this.currentRideProgress.rideId === data.rideId
@@ -366,7 +418,9 @@ class SocketClient {
     });
 
     this.socket.on("ride_participant_disconnected", data => {
-      // data: { rideId, disconnectedUser } // Driver disconnected
+      console.log(
+        "[BroadcastSocket] Event: 'ride_participant_disconnected'. Received.",
+      );
       if (
         this.currentRideProgress &&
         this.currentRideProgress.rideId === data.rideId &&
@@ -391,6 +445,7 @@ class SocketClient {
 
     // room_members listener (from get_room_members server event) can be kept if needed for bidding UI
     this.socket.on("room_members", data => {
+      console.log("[BroadcastSocket] Event: 'room_members'. Received.");
       this.triggerEvent("room_members", data);
     });
 
@@ -404,8 +459,7 @@ class SocketClient {
 
   private triggerEvent(eventName: string, data?: any) {
     console.log(
-      `[BroadcastSocket] triggerEvent: Attempting to emit '${eventName}'. Connected: ${this.isConnected}, Socket ID: ${this.socketId}. Data:`,
-      data,
+      `[BroadcastSocket] triggerEvent: Emitting '${eventName}'. Connected: ${this.isConnected}, Socket ID: ${this.socketId}.`,
     );
     const listeners = this.eventListeners.get(eventName) || [];
     listeners.forEach(listener => listener(data));

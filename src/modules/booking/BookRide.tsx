@@ -30,18 +30,10 @@ import {
 } from "@react-navigation/native";
 import {useSocket} from "../../hooks/useSocket";
 import {BookingStackParamList} from "../../types/navigation/navigation.types";
-import MapView, {Marker, PROVIDER_GOOGLE} from "react-native-maps";
-import MapViewDirections from "react-native-maps-directions";
 import {Dimensions as RNDimensions} from "react-native";
-import Config from "react-native-config";
 import {QuotationRequestPayload} from "../../types/ride/types/ride.types";
 
 const {width: screenWidth, height: screenHeight} = RNDimensions.get("window");
-
-// IMPORTANT: Ensure GOOGLE_MAPS_API_KEY_BOOKRIDE is set in your .env file
-const GOOGLE_MAPS_API_KEY_BOOKRIDE =
-  Config.GOOGLE_MAPS_API_KEY_BOOKRIDE ||
-  "YOUR_GOOGLE_MAPS_API_KEY_WITH_DIRECTIONS_ENABLED"; // FIXME: Set GOOGLE_MAPS_API_KEY_BOOKRIDE in your .env file. Ensure the Directions API is enabled for this key in your Google Cloud Console.
 
 // Define the expected structure for selected locations
 interface SelectedLocation {
@@ -82,7 +74,7 @@ const BookRide: React.FC<BookRideProps> = ({route}) => {
     currentRideState: socketRideState,
     isConnected: isSocketConnected,
   } = useSocket();
-  const mapRef = useRef<MapView>(null);
+  const webViewRef = useRef<WebView>(null);
 
   const [compare, setCompare] = useState(false);
   const [isPayment, setIsPayment] = useState(false);
@@ -186,11 +178,11 @@ const BookRide: React.FC<BookRideProps> = ({route}) => {
 
   // CONDITIONAL EARLY RETURN: If essential data is not ready, render nothing or a loader.
   // This MUST come AFTER ALL hook declarations.
-  if (!isEssentialDataReady) {
-    // You can return null or a loading indicator.
-    // Returning null is fine if the alert and navigation.goBack() handle user feedback.
-    return null;
-  }
+  // if (!isEssentialDataReady) { // <<<<< We will move this condition to the JSX
+  // You can return null or a loading indicator.
+  // Returning null is fine if the alert and navigation.goBack() handle user feedback.
+  // return null;
+  // }
 
   // Function to handle ride type selection
   const handleRideSelection = (rideName: string, price: number) => {
@@ -328,10 +320,10 @@ const BookRide: React.FC<BookRideProps> = ({route}) => {
       requestedAt: new Date().toISOString(),
     };
 
-    console.log(
-      "Attempting to submit quotation request with data:",
-      quotationDataForServer,
-    );
+    // console.log(
+    //   "Attempting to submit quotation request with data:",
+    //   quotationDataForServer,
+    // ); // Removed for cleanup: logs sensitive data
 
     if (!submitQuotationRequest) {
       Alert.alert("Error", "submitQuotationRequest not available. Dev issue.");
@@ -424,242 +416,218 @@ const BookRide: React.FC<BookRideProps> = ({route}) => {
   const finalPickupCoords = passedPickupLocation!.coordinates;
   const finalDropOffCoords = passedDropOffLocation!.coordinates;
 
-  console.log(
-    "[BookRide] Final Pickup Coords:",
-    JSON.stringify(finalPickupCoords),
-  );
-  console.log(
-    "[BookRide] Final Dropoff Coords:",
-    JSON.stringify(finalDropOffCoords),
-  );
-  console.log(
-    "[BookRide] Google Maps API Key Used:",
-    GOOGLE_MAPS_API_KEY_BOOKRIDE,
-  );
+  // console.log(
+  //   "[BookRide] Final Pickup Coords:",
+  //   JSON.stringify(finalPickupCoords),
+  // );
+  // console.log(
+  //   "[BookRide] Final Dropoff Coords:",
+  //   JSON.stringify(finalDropOffCoords),
+  // );
+
+  const sendDataToWebView = () => {
+    if (webViewRef.current && finalPickupCoords && finalDropOffCoords) {
+      const script = `
+        if (window.setLocationsAndCalculateRoute) {
+          window.setLocationsAndCalculateRoute(${finalPickupCoords.lng}, ${finalPickupCoords.lat}, ${finalDropOffCoords.lng}, ${finalDropOffCoords.lat});
+        } else {
+          console.warn('setLocationsAndCalculateRoute not ready in WebView');
+        }
+      `;
+      webViewRef.current.injectJavaScript(script);
+      // console.log(
+      //   "[BookRide] Sent coordinates to WebView:",
+      //   finalPickupCoords,
+      //   finalDropOffCoords,
+      // );
+    }
+  };
+
+  useEffect(() => {
+    if (isEssentialDataReady) {
+      // console.log(
+      //   "[BookRide] Essential data ready, attempting to send to WebView.",
+      // );
+    }
+  }, [isEssentialDataReady, finalPickupCoords, finalDropOffCoords]);
 
   return (
     <ScrollView
       style={styles.mainScrollContainer}
       contentContainerStyle={styles.scrollContentContainer}>
-      <View style={styles.container}>
-        <View style={styles.locationSummaryContainer}>
-          <Text style={styles.locationSummaryText}>
-            Pickup: {rideState.pickupLocation?.address || "Fetching address..."}
-          </Text>
-          <Text style={styles.locationSummaryText}>
-            Drop-off:{" "}
-            {rideState.dropOffLocation?.address || "Fetching address..."}
-          </Text>
-        </View>
+      {isEssentialDataReady ? (
+        <View style={styles.container}>
+          <View style={styles.locationSummaryContainer}>
+            <Text style={styles.locationSummaryText}>
+              Pickup:{" "}
+              {rideState.pickupLocation?.address || "Fetching address..."}
+            </Text>
+            <Text style={styles.locationSummaryText}>
+              Drop-off:{" "}
+              {rideState.dropOffLocation?.address || "Fetching address..."}
+            </Text>
+          </View>
 
-        <View style={styles.mapContainer}>
-          <MapView
-            ref={mapRef}
-            provider={PROVIDER_GOOGLE}
-            style={styles.map}
-            initialRegion={{
-              latitude: (finalPickupCoords.lat + finalDropOffCoords.lat) / 2,
-              longitude: (finalPickupCoords.lng + finalDropOffCoords.lng) / 2,
-              latitudeDelta:
-                Math.abs(finalPickupCoords.lat - finalDropOffCoords.lat) * 2,
-              longitudeDelta:
-                Math.abs(finalPickupCoords.lng - finalDropOffCoords.lng) * 2,
-            }}>
-            <Marker
-              coordinate={{
-                latitude: finalPickupCoords.lat,
-                longitude: finalPickupCoords.lng,
+          <View style={styles.mapContainer}>
+            <WebView
+              ref={webViewRef}
+              originWhitelist={["*"]}
+              source={{uri: "file:///android_asset/map.html"}} // Make sure this path is correct for your setup
+              style={styles.map}
+              onLoadEnd={() => {
+                // console.log("[BookRide] WebView loaded. Sending coordinates.");
+                sendDataToWebView();
               }}
-              title="Pickup Location"
-              description={
-                rideState.pickupLocation?.address || "Fetching address..."
-              }
-              pinColor="green"
-            />
-            <Marker
-              coordinate={{
-                latitude: finalDropOffCoords.lat,
-                longitude: finalDropOffCoords.lng,
+              onError={syntheticEvent => {
+                const {nativeEvent} = syntheticEvent;
+                console.warn("[BookRide] WebView error: ", nativeEvent);
               }}
-              title="Drop-off Location"
-              description={
-                rideState.dropOffLocation?.address || "Fetching address..."
-              }
-              pinColor="red"
-            />
-            {rideState.pickupLocation?.latitude &&
-              rideState.dropOffLocation?.latitude &&
-              rideState.pickupLocation.longitude &&
-              rideState.dropOffLocation.longitude &&
-              (() => {
-                const origin = {
-                  latitude: parseFloat(rideState.pickupLocation!.latitude),
-                  longitude: parseFloat(rideState.pickupLocation!.longitude),
-                };
-                const destination = {
-                  latitude: parseFloat(rideState.dropOffLocation!.latitude),
-                  longitude: parseFloat(rideState.dropOffLocation!.longitude),
-                };
+              onMessage={event => {
+                // Handle messages from WebView if needed
                 console.log(
-                  "[BookRide] Rendering MapViewDirections with Origin:",
-                  origin,
-                  "Destination:",
-                  destination,
-                  "API Key used:",
-                  GOOGLE_MAPS_API_KEY_BOOKRIDE.substring(0, 10) + "...",
-                );
-                return (
-                  <MapViewDirections
-                    origin={origin}
-                    destination={destination}
-                    apikey={GOOGLE_MAPS_API_KEY_BOOKRIDE}
-                    strokeWidth={4}
-                    strokeColor="#007AFF"
-                    mode="DRIVING"
-                    onReady={result => {
-                      mapRef.current?.fitToCoordinates(result.coordinates, {
-                        edgePadding: {
-                          right: screenWidth / 20,
-                          bottom: screenHeight / 20,
-                          left: screenWidth / 20,
-                          top: screenHeight / 20,
-                        },
-                      });
-                    }}
-                    onError={errorMessage => {
-                      console.error(
-                        "MapViewDirections Error (BookRide): ",
-                        errorMessage,
-                      );
-                    }}
-                  />
-                );
-              })()}
-          </MapView>
-        </View>
+                  "[BookRide] Message from WebView:",
+                  event.nativeEvent.data,
+                ); // Keep this if message passing is planned
+              }}
+              javaScriptEnabled={true}
+              domStorageEnabled={true}
+              startInLoadingState={true}
+              // renderLoading={() => <ActivityIndicator size="large" color={primaryColor} />} // Optional loading indicator
+            />
+          </View>
 
-        <View style={styles.tabContainer}>
-          {!isPayment ? (
-            <>
-              <DullDivider />
-              <View>
-                {!showDrivers
-                  ? (compare ? ridesDataCompared : ridesData)?.map(
-                      (item, index) => (
-                        <TouchableOpacity
-                          key={index.toString()}
-                          style={[
-                            styles.listItem,
-                            rideState.selectedRideType === item.name &&
-                              styles.selectedRide,
-                          ]}
-                          onPress={() => {
-                            const priceString = item.price;
-                            const numericPrice = parseInt(
-                              priceString.replace("₹ ", ""),
-                              10,
-                            );
-                            if (!isNaN(numericPrice)) {
-                              handleRideSelection(item.name, numericPrice);
-                            } else {
-                              console.error(
-                                "Could not parse price:",
-                                priceString,
+          <View style={styles.tabContainer}>
+            {!isPayment ? (
+              <>
+                <DullDivider />
+                <View>
+                  {!showDrivers
+                    ? (compare ? ridesDataCompared : ridesData)?.map(
+                        (item, index) => (
+                          <TouchableOpacity
+                            key={index.toString()}
+                            style={[
+                              styles.listItem,
+                              rideState.selectedRideType === item.name &&
+                                styles.selectedRide,
+                            ]}
+                            onPress={() => {
+                              const priceString = item.price;
+                              const numericPrice = parseInt(
+                                priceString.replace("₹ ", ""),
+                                10,
                               );
-                            }
-                          }}>
-                          <CarIcon width={50} height={50} />
-                          <View style={{flexGrow: 1}}>
-                            <Text style={styles.h1}>{item.name}</Text>
-                            <Text style={styles.h2}>{item.arrival}</Text>
-                          </View>
-                          <Text style={[styles.h1, {alignSelf: "flex-start"}]}>
-                            {item.price}
-                          </Text>
-                        </TouchableOpacity>
-                      ),
-                    )
-                  : animatedDrivers.map(driver => renderDriverItem(driver))}
-              </View>
-              <Margin margin={10} />
-              <View style={{paddingHorizontal: 20, marginTop: 5}}>
-                <CustomButton
-                  title="Continue Booking Your GO Ride"
-                  status="primary"
-                  size="medium"
-                  onPress={() => {
-                    setIsPayment(true);
-                  }}
-                />
-              </View>
-            </>
-          ) : (
-            <>
-              <View style={{padding: 20}}>
-                <TouchableOpacity
-                  style={styles.backButton}
-                  onPress={() => setIsPayment(false)}>
-                  <Text style={styles.backButtonText}>
-                    ← Back to vehicle selection
-                  </Text>
-                </TouchableOpacity>
-                <View style={styles.priceContainer}>
-                  <Text style={styles.priceLabel}>Estimated Price:</Text>
-                  <Text style={styles.priceValue}>$25</Text>
+                              if (!isNaN(numericPrice)) {
+                                handleRideSelection(item.name, numericPrice);
+                              } else {
+                                console.error(
+                                  "Could not parse price:",
+                                  priceString,
+                                );
+                              }
+                            }}>
+                            <CarIcon width={50} height={50} />
+                            <View style={{flexGrow: 1}}>
+                              <Text style={styles.h1}>{item.name}</Text>
+                              <Text style={styles.h2}>{item.arrival}</Text>
+                            </View>
+                            <Text
+                              style={[styles.h1, {alignSelf: "flex-start"}]}>
+                              {item.price}
+                            </Text>
+                          </TouchableOpacity>
+                        ),
+                      )
+                    : animatedDrivers.map(driver => renderDriverItem(driver))}
                 </View>
-                <RadioGroup
-                  selectedIndex={paymentMethod !== null ? paymentMethod : -1}
-                  onChange={handlePaymentMethodChange}>
-                  <Radio style={styles.option}>
-                    {_evaProps => (
-                      <>
-                        <Text style={styles.h3}>Metamask Wallet</Text>
-                        <MetamaskIcon width={25} height={25} />
-                      </>
-                    )}
-                  </Radio>
-                  <Radio style={styles.option}>
-                    {_evaProps => (
-                      <>
-                        <Text style={styles.h3}>Credit Card</Text>
-                        <CardIcon width={25} height={25} />
-                      </>
-                    )}
-                  </Radio>
-                  <Radio style={styles.option}>
-                    {_evaProps => (
-                      <>
-                        <Text style={styles.h3}>Debit Card</Text>
-                        <CardIcon width={25} height={25} />
-                      </>
-                    )}
-                  </Radio>
-                  <Radio style={styles.option}>
-                    {_evaProps => (
-                      <>
-                        <Text style={styles.h3}>Cash</Text>
-                        <CashIcon width={25} height={25} />
-                      </>
-                    )}
-                  </Radio>
-                </RadioGroup>
-                <View style={{marginTop: 15}}>
+                <Margin margin={10} />
+                <View style={{paddingHorizontal: 20, marginTop: 5}}>
                   <CustomButton
-                    title="Request Quotes"
-                    status={paymentMethod !== null ? "primary" : "disabled"}
+                    title="Continue Booking Your GO Ride"
+                    status="primary"
                     size="medium"
-                    onPress={handleRequestQuotes}
-                    disabled={paymentMethod === null}
+                    onPress={() => {
+                      setIsPayment(true);
+                    }}
                   />
                 </View>
-                <Text style={styles.paymentNote}>
-                  Payment will be processed at the end of your ride
-                </Text>
-              </View>
-            </>
-          )}
+              </>
+            ) : (
+              <>
+                <View style={{padding: 20}}>
+                  <TouchableOpacity
+                    style={styles.backButton}
+                    onPress={() => setIsPayment(false)}>
+                    <Text style={styles.backButtonText}>
+                      ← Back to vehicle selection
+                    </Text>
+                  </TouchableOpacity>
+                  <View style={styles.priceContainer}>
+                    <Text style={styles.priceLabel}>Estimated Price:</Text>
+                    <Text style={styles.priceValue}>$25</Text>
+                  </View>
+                  <RadioGroup
+                    selectedIndex={paymentMethod !== null ? paymentMethod : -1}
+                    onChange={handlePaymentMethodChange}>
+                    <Radio style={styles.option}>
+                      {_evaProps => (
+                        <>
+                          <Text style={styles.h3}>Metamask Wallet</Text>
+                          <MetamaskIcon width={25} height={25} />
+                        </>
+                      )}
+                    </Radio>
+                    <Radio style={styles.option}>
+                      {_evaProps => (
+                        <>
+                          <Text style={styles.h3}>Credit Card</Text>
+                          <CardIcon width={25} height={25} />
+                        </>
+                      )}
+                    </Radio>
+                    <Radio style={styles.option}>
+                      {_evaProps => (
+                        <>
+                          <Text style={styles.h3}>Debit Card</Text>
+                          <CardIcon width={25} height={25} />
+                        </>
+                      )}
+                    </Radio>
+                    <Radio style={styles.option}>
+                      {_evaProps => (
+                        <>
+                          <Text style={styles.h3}>Cash</Text>
+                          <CashIcon width={25} height={25} />
+                        </>
+                      )}
+                    </Radio>
+                  </RadioGroup>
+                  <View style={{marginTop: 15}}>
+                    <CustomButton
+                      title="Request Quotes"
+                      status={paymentMethod !== null ? "primary" : "disabled"}
+                      size="medium"
+                      onPress={handleRequestQuotes}
+                      disabled={paymentMethod === null}
+                    />
+                  </View>
+                  <Text style={styles.paymentNote}>
+                    Payment will be processed at the end of your ride
+                  </Text>
+                </View>
+              </>
+            )}
+          </View>
         </View>
-      </View>
+      ) : (
+        // Optional: Render a loading indicator or null while essential data is not ready
+        // If navigation.goBack() is called, this part might not even be visible for long.
+        <View style={styles.containerAlteredForMessage}>
+          <Text style={styles.messageText}>
+            Loading ride details or redirecting...
+          </Text>
+        </View>
+      )}
       {(rideState.status === "creating_request" ||
         rideState.status === "QUOTATION_REQUEST_INITIATED" ||
         socketRideState?.status === "creating_request" || // Retain for direct ride if ever used

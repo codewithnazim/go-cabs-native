@@ -5,8 +5,12 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <title>Ride Map</title>
-    <script
-        src="https://maps.googleapis.com/maps/api/js?key=AIzaSyCFGA0WOSUzALjA-CvKVgklqkO4P-zvvs0&libraries=places"></script>
+    <!-- Mapbox GL JS -->
+    <script src='https://api.mapbox.com/mapbox-gl-js/v2.9.1/mapbox-gl.js'></script>
+    <link href='https://api.mapbox.com/mapbox-gl-js/v2.9.1/mapbox-gl.css' rel='stylesheet' />
+    <!-- Mapbox Geocoder (optional, if you want a search box directly on map) -->
+    <!-- <script src="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-geocoder/v5.0.0/mapbox-gl-geocoder.min.js"></script> -->
+    <!-- <link rel="stylesheet" href="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-geocoder/v5.0.0/mapbox-gl-geocoder.css" type="text/css"> -->
     <style>
         /* Basic styling */
         html,
@@ -38,86 +42,113 @@
 
 <body>
     <div id="map"></div>
-    <div id="info">Calculating route...</div>
+    <div id="info">Initializing map...</div>
 
     <script>
-        let map;
-        const directionsService = new google.maps.DirectionsService();
-        const directionsRenderer = new google.maps.DirectionsRenderer({
-            suppressMarkers: true // We'll add custom markers
-        });
+        mapboxgl.accessToken = 'pk.eyJ1IjoiZ29jYWJzIiwiYSI6ImNtYXBnMmJncTA4NXQyanF2NXIzMHEwNWkifQ.7arQIkXZmcjAiGaqPRKDAQ';
 
-        // --- Static Locations ---
-        const pickupLocation = { lat: 12.9716, lng: 77.5946 }; // Example: Bangalore City Center
-        const destinationLocation = { lat: 12.9279, lng: 77.6271 }; // Example: Koramangala
+        let map;
+        let pickupLocation = null;
+        let destinationLocation = null;
+        let activeMarkers = [];
+
+        window.setLocationsAndCalculateRoute = function (pLng, pLat, dLng, dLat) {
+            pickupLocation = [parseFloat(pLng), parseFloat(pLat)];
+            destinationLocation = [parseFloat(dLng), parseFloat(dLat)];
+
+            if (map && map.loaded()) {
+                clearMapLayersAndMarkers();
+                addMarkers();
+                calculateAndDisplayRoute();
+            } else {
+                // Locations are set, map.on('load') will pick them up or this function will be called again by RN if map wasn't ready.
+            }
+        };
+
+        function clearMapLayersAndMarkers() {
+            if (map.getLayer('route')) map.removeLayer('route');
+            if (map.getSource('route')) map.removeSource('route');
+            activeMarkers.forEach(marker => marker.remove());
+            activeMarkers = [];
+        }
+
+        function addMarkers() {
+            if (!pickupLocation || !destinationLocation) return;
+            const pickupMarker = new mapboxgl.Marker().setLngLat(pickupLocation).setPopup(new mapboxgl.Popup().setText("Pickup")).addTo(map);
+            activeMarkers.push(pickupMarker);
+            const destinationMarker = new mapboxgl.Marker().setLngLat(destinationLocation).setPopup(new mapboxgl.Popup().setText("Destination")).addTo(map);
+            activeMarkers.push(destinationMarker);
+        }
 
         function initMap() {
-            map = new google.maps.Map(document.getElementById("map"), {
-                center: pickupLocation, // Center map initially on pickup
-                zoom: 12, // Adjust zoom as needed
-                disableDefaultUI: true, // Hide default controls for a cleaner look
+            map = new mapboxgl.Map({
+                container: 'map',
+                style: 'mapbox://styles/mapbox/streets-v11',
+                center: [0, 0], // Generic center
+                zoom: 1   // Low zoom
             });
 
-            directionsRenderer.setMap(map);
-
-            // Add custom markers
-            new google.maps.Marker({
-                position: pickupLocation,
-                map: map,
-                title: "Pickup",
-                // You can use custom icons here
-                // icon: 'path/to/pickup-icon.png'
-            });
-
-            new google.maps.Marker({
-                position: destinationLocation,
-                map: map,
-                title: "Destination",
-                // icon: 'path/to/destination-icon.png'
-            });
-
-            calculateAndDisplayRoute();
-        }
-
-        function calculateAndDisplayRoute() {
-            directionsService.route(
-                {
-                    origin: pickupLocation,
-                    destination: destinationLocation,
-                    travelMode: google.maps.TravelMode.DRIVING,
-                },
-                (response, status) => {
-                    if (status === "OK" && response) {
-                        directionsRenderer.setDirections(response);
-
-                        // Extract distance and duration
-                        const route = response.routes[0];
-                        if (route && route.legs && route.legs[0]) {
-                            const leg = route.legs[0];
-                            const distanceText = leg.distance?.text || 'N/A';
-                            const durationText = leg.duration?.text || 'N/A';
-                            document.getElementById('info').innerText = `Distance: ${distanceText} (${durationText})`;
-
-                            // Adjust map bounds to fit the route
-                            const bounds = new google.maps.LatLngBounds();
-                            bounds.extend(pickupLocation);
-                            bounds.extend(destinationLocation);
-                            map.fitBounds(bounds, { padding: 60 }); // Add padding around the route
-                        } else {
-                            document.getElementById('info').innerText = 'Route details not found.';
-                        }
-
-                    } else {
-                        window.alert("Directions request failed due to " + status);
-                        document.getElementById('info').innerText = 'Could not calculate route.';
-                    }
+            map.on('load', () => {
+                document.getElementById('info').innerText = 'Waiting for location data...';
+                if (pickupLocation && destinationLocation) {
+                    addMarkers();
+                    calculateAndDisplayRoute();
                 }
-            );
+            });
+            map.on('error', (e) => {
+                console.error('Mapbox GL error:', e.error ? e.error.message : e);
+                document.getElementById('info').innerText = 'Map error.';
+            });
         }
 
-        // Initialize the map when the window loads
-        window.onload = initMap;
+        async function calculateAndDisplayRoute() {
+            if (!pickupLocation || !destinationLocation) {
+                document.getElementById('info').innerText = 'Please provide pickup and drop-off.';
+                return;
+            }
+            document.getElementById('info').innerText = 'Calculating route...';
+            if (!mapboxgl.accessToken) {
+                console.error("WebView: Missing access token for routing.");
+                document.getElementById('info').innerText = 'Error: Missing access token.';
+                return;
+            }
+            const coordinates = `${pickupLocation.join(',')};${destinationLocation.join(',')}`;
+            const queryUrl = `https://api.mapbox.com/directions/v5/mapbox/driving/${coordinates}?steps=true&geometries=geojson&access_token=${mapboxgl.accessToken}`;
 
+            try {
+                const query = await fetch(queryUrl, { method: 'GET' });
+                const json = await query.json();
+
+                if (json.routes && json.routes.length) {
+                    const data = json.routes[0];
+                    const route = data.geometry.coordinates;
+                    const geojson = { type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates: route } };
+
+                    if (map.getSource('route')) map.getSource('route').setData(geojson);
+                    else {
+                        map.addLayer({
+                            id: 'route', type: 'line', source: { type: 'geojson', data: geojson },
+                            layout: { 'line-join': 'round', 'line-cap': 'round' },
+                            paint: { 'line-color': '#3887be', 'line-width': 5, 'line-opacity': 0.75 }
+                        });
+                    }
+                    const distance = (data.distance / 1000).toFixed(2);
+                    const duration = Math.round(data.duration / 60);
+                    document.getElementById('info').innerText = `Distance: ${distance} km (${duration} mins)`;
+                    const bounds = new mapboxgl.LngLatBounds(route[0], route[0]);
+                    for (const coord of route) bounds.extend(coord);
+                    map.fitBounds(bounds, { padding: 60 });
+                } else {
+                    const message = json.message || "Directions request failed";
+                    document.getElementById('info').innerText = `Route Error: ${message}`;
+                    console.error("Mapbox Directions API error:", json);
+                }
+            } catch (error) {
+                console.error("Error fetching directions:", error);
+                document.getElementById('info').innerText = 'Could not fetch route details.';
+            }
+        }
+        window.onload = initMap;
     </script>
 </body>
 

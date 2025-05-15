@@ -98,6 +98,7 @@ const Home = () => {
               setIsPickupActive(true);
               setIsDropOffActive(false);
             }}
+            mapboxAccessToken="pk.eyJ1IjoiZ29jYWJzIiwiYSI6ImNtYXBnMmJncTA4NXQyanF2NXIzMHEwNWkifQ.7arQIkXZmcjAiGaqPRKDAQ"
           />
         </View>
         <Margin margin={10} />
@@ -113,6 +114,7 @@ const Home = () => {
               setIsDropOffActive(true);
               setIsPickupActive(false);
             }}
+            mapboxAccessToken="pk.eyJ1IjoiZ29jYWJzIiwiYSI6ImNtYXBnMmJncTA4NXQyanF2NXIzMHEwNWkifQ.7arQIkXZmcjAiGaqPRKDAQ"
           />
         </View>
 
