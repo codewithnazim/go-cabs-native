@@ -3,6 +3,7 @@ import {RideRequestSchema} from "../../../types/ride/schema/ride.request";
 import {validate} from "../../../utils/zod/validate";
 import {EventEmitter} from "events";
 import {RideRequest} from "../../../types/ride/types/ride.types";
+import {QuotationRequestPayload} from "../../../types/ride/types/ride.types";
 
 // Define the server URL using an environment variable with a fallback
 const SOCKET_SERVER_URL =
@@ -26,12 +27,13 @@ export interface CurrentRideProgress {
   rideId?: string;
   bidding_room_id?: string;
   active_ride_room_id?: string;
-  rideDetails?: RideRequest;
+  requestDetails?: RideRequest | QuotationRequestPayload;
   bids: Map<string, Bid>; // driverSocketId -> Bid object
   selectedDriverInfo?: any;
   status:
     | "idle"
     | "creating_request"
+    | "creating_quotation_request"
     | "pending_bids"
     | "driver_selection_pending"
     | "confirmed_in_progress"
@@ -189,11 +191,14 @@ class SocketClient {
       // data: { rideId, bidding_room_id, rideDetails }
       if (
         this.currentRideProgress &&
-        this.currentRideProgress.status === "creating_request"
+        (this.currentRideProgress.status === "creating_request" ||
+          this.currentRideProgress.status === "creating_quotation_request")
       ) {
         this.currentRideProgress.rideId = data.rideId;
         this.currentRideProgress.bidding_room_id = data.bidding_room_id;
-        this.currentRideProgress.rideDetails = data.rideDetails;
+        if (data.rideDetails) {
+          this.currentRideProgress.requestDetails = data.rideDetails;
+        }
         this.currentRideProgress.status = "pending_bids";
         this.currentRideProgress.errorMessage = undefined;
         this.triggerEvent("ride_progress_update", this.currentRideProgress);
@@ -205,14 +210,48 @@ class SocketClient {
       // data: { message, error }
       if (
         this.currentRideProgress &&
-        this.currentRideProgress.status === "creating_request"
+        (this.currentRideProgress.status === "creating_request" ||
+          this.currentRideProgress.status === "creating_quotation_request")
       ) {
         this.currentRideProgress.status = "error";
         this.currentRideProgress.errorMessage =
-          data.message || "Failed to create ride request.";
+          data.message || "Failed to create ride/quotation request.";
         this.triggerEvent("ride_progress_update", this.currentRideProgress);
       }
       this.triggerEvent("ride_request_error", data);
+    });
+
+    // Specific ack for quotation request, if backend sends a different event
+    // Otherwise, the generic ride_request_created_ack might be sufficient if backend adapts
+    this.socket.on("quotation_request_created_ack", data => {
+      // data: { quotationId, bidding_room_id, quotationDetails }
+      if (
+        this.currentRideProgress &&
+        this.currentRideProgress.status === "creating_quotation_request"
+      ) {
+        this.currentRideProgress.rideId = data.quotationId;
+        this.currentRideProgress.bidding_room_id = data.bidding_room_id;
+        if (data.quotationDetails) {
+          this.currentRideProgress.requestDetails = data.quotationDetails;
+        }
+        this.currentRideProgress.status = "pending_bids";
+        this.currentRideProgress.errorMessage = undefined;
+        this.triggerEvent("ride_progress_update", this.currentRideProgress);
+      }
+      this.triggerEvent("quotation_request_created_ack", data);
+    });
+
+    this.socket.on("quotation_request_error", data => {
+      if (
+        this.currentRideProgress &&
+        this.currentRideProgress.status === "creating_quotation_request"
+      ) {
+        this.currentRideProgress.status = "error";
+        this.currentRideProgress.errorMessage =
+          data.message || "Failed to create quotation request.";
+        this.triggerEvent("ride_progress_update", this.currentRideProgress);
+      }
+      this.triggerEvent("quotation_request_error", data);
     });
 
     this.socket.on("new_bid_for_your_ride", (data: NewBidData) => {
@@ -227,7 +266,17 @@ class SocketClient {
           bidDetails: data.bidDetails,
           driverInfo: data.driverInfo,
         };
-        this.currentRideProgress.bids.set(data.driverSocketId, bidToStore);
+
+        // Create a new Map for bids to ensure reference change for React state updates
+        const newBids = new Map(this.currentRideProgress.bids);
+        newBids.set(data.driverSocketId, bidToStore);
+
+        // Create a new object for currentRideProgress to ensure reference change
+        this.currentRideProgress = {
+          ...this.currentRideProgress,
+          bids: newBids, // Assign the new Map
+        };
+
         this.triggerEvent("ride_progress_update", this.currentRideProgress);
       }
       this.triggerEvent("new_bid_for_your_ride", data); // Trigger with full NewBidData for UI
@@ -272,7 +321,7 @@ class SocketClient {
         this.currentRideProgress.active_ride_room_id = data.active_ride_room_id;
         this.currentRideProgress.selectedDriverInfo = data.driverInfo;
         // rideDetails should already be there, but can update if server sends a modified version
-        this.currentRideProgress.rideDetails = data.rideDetails;
+        this.currentRideProgress.requestDetails = data.rideDetails;
         this.currentRideProgress.status = "confirmed_in_progress";
         this.currentRideProgress.errorMessage = undefined;
         this.joinRoom(data.active_ride_room_id); // Automatically join the active ride room
@@ -420,21 +469,21 @@ class SocketClient {
   }
 
   // --- New/Refactored Public Methods for Rider ---
-  public createRideRequest(rideData: any) {
+  public createRideRequest(rideData: RideRequest) {
     if (!this.socket || !this.isConnected) {
       this.triggerEvent("error", {message: "Not connected to server."});
       this.resetRideProgress("error", "Not connected to server.");
       return;
     }
     try {
-      // It's better if rideData is already validated and typed from the UI layer
-      // const validatedData = validate(RideRequestSchema, rideData);
+      // const validatedData = validate(RideRequestSchema, rideData); // Zod validation if needed
       const validatedData = rideData;
 
       this.currentRideProgress = {
-        rideDetails: validatedData,
-        bids: new Map(),
-        status: "creating_request",
+        ...this.currentRideProgress, // Preserve existing bids map etc. if any, or ensure clean state
+        requestDetails: validatedData,
+        bids: this.currentRideProgress?.bids || new Map(), // Preserve bids if any
+        status: "creating_request", // Generic status
       };
       this.triggerEvent("ride_progress_update", this.currentRideProgress);
       this.socket.emit("rider_create_ride_request", validatedData);
@@ -444,6 +493,55 @@ class SocketClient {
       this.resetRideProgress("error", "Invalid ride data provided.");
       this.triggerEvent("error", {
         message: "Invalid ride data for submission.",
+        details: error,
+      });
+    }
+  }
+
+  public submitQuotationRequest(quotationData: QuotationRequestPayload) {
+    if (!this.socket || !this.isConnected) {
+      this.triggerEvent("error", {message: "Not connected to server."});
+      // Consider not calling resetRideProgress here unless it's a definite full reset
+      // Setting error status locally might be enough if a request was already in some state.
+      if (this.currentRideProgress) {
+        this.currentRideProgress.status = "error";
+        this.currentRideProgress.errorMessage =
+          "Not connected to server (quotation attempt).";
+        this.triggerEvent("ride_progress_update", this.currentRideProgress);
+      } else {
+        this.resetRideProgress(
+          "error",
+          "Not connected to server (quotation attempt).",
+        );
+      }
+      return;
+    }
+    try {
+      // No Zod schema for QuotationRequestPayload yet, but can be added
+      const validatedData = quotationData;
+
+      this.currentRideProgress = {
+        ...this.currentRideProgress, // Preserve existing bids map etc. if any
+        requestDetails: validatedData, // Store quotation details
+        bids: this.currentRideProgress?.bids || new Map(), // Preserve bids
+        status: "creating_quotation_request", // New specific status
+      };
+      this.triggerEvent("ride_progress_update", this.currentRideProgress);
+      // Emit a new, specific event for quotation requests
+      this.socket.emit("rider_submit_quotation_request", validatedData);
+      console.log("Emitted: rider_submit_quotation_request", validatedData);
+    } catch (error) {
+      console.error("Data validation failed for quotation request:", error);
+      if (this.currentRideProgress) {
+        this.currentRideProgress.status = "error";
+        this.currentRideProgress.errorMessage =
+          "Invalid quotation data provided.";
+        this.triggerEvent("ride_progress_update", this.currentRideProgress);
+      } else {
+        this.resetRideProgress("error", "Invalid quotation data provided.");
+      }
+      this.triggerEvent("error", {
+        message: "Invalid quotation data for submission.",
         details: error,
       });
     }

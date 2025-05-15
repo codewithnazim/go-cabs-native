@@ -34,5 +34,21 @@ export interface RideState {
     method: "metamask" | "credit" | "debit" | "cash";
     confirmed: boolean;
   };
-  status?: "searching" | "driverFound" | "confirmed" | "started" | "completed";
+  status?:
+    | "idle"
+    | "selecting_location"
+    | "configuring_ride"
+    | "creating_request"
+    | "QUOTATION_REQUEST_INITIATED"
+    | "PENDING_BIDS"
+    | "BIDS_RECEIVED"
+    | "searching"
+    | "driverFound"
+    | "confirmed"
+    | "started"
+    | "completed"
+    | "cancelled"
+    | "error";
+  quotationRequestId?: string;
+  errorMessage?: string;
 }

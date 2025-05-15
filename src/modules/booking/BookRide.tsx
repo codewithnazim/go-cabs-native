@@ -29,12 +29,12 @@ import {
   RouteProp,
 } from "@react-navigation/native";
 import {useSocket} from "../../hooks/useSocket";
-import {RideRequest} from "../../types/ride/types/ride.types";
 import {BookingStackParamList} from "../../types/navigation/navigation.types";
 import MapView, {Marker, PROVIDER_GOOGLE} from "react-native-maps";
 import MapViewDirections from "react-native-maps-directions";
 import {Dimensions as RNDimensions} from "react-native";
 import Config from "react-native-config";
+import {QuotationRequestPayload} from "../../types/ride/types/ride.types";
 
 const {width: screenWidth, height: screenHeight} = RNDimensions.get("window");
 
@@ -69,47 +69,20 @@ interface BookRideProps {
 
 const BookRide: React.FC<BookRideProps> = ({route}) => {
   const navigation = useNavigation<NavigationProp<BookingStackParamList>>();
+  const passedPickupLocation = route.params?.pickupLocation;
+  const passedDropOffLocation = route.params?.dropOffLocation;
+
+  // State to manage if essential data is ready for rendering the main component
+  const [isEssentialDataReady, setIsEssentialDataReady] = useState(false);
+
+  // ALL HOOKS MUST BE DECLARED BEFORE ANY CONDITIONAL EARLY RETURN
   const [rideState, setRideState] = useRecoilState(rideAtom);
   const {
-    createRideRequest,
+    submitQuotationRequest,
     currentRideState: socketRideState,
     isConnected: isSocketConnected,
   } = useSocket();
   const mapRef = useRef<MapView>(null);
-
-  // Get pickup and dropOff locations from route params
-  const passedPickupLocation = route.params?.pickupLocation;
-  const passedDropOffLocation = route.params?.dropOffLocation;
-
-  useEffect(() => {
-    // Initialize rideState with passed locations if available
-    if (passedPickupLocation && passedDropOffLocation) {
-      setRideState(prev => ({
-        ...prev,
-        pickupLocation: {
-          latitude: String(passedPickupLocation.coordinates.lat),
-          longitude: String(passedPickupLocation.coordinates.lng),
-          address: passedPickupLocation.address,
-        },
-        dropOffLocation: {
-          latitude: String(passedDropOffLocation.coordinates.lat),
-          longitude: String(passedDropOffLocation.coordinates.lng),
-          address: passedDropOffLocation.address,
-        },
-        selectedRideType: undefined,
-        fare: undefined,
-        payment: undefined,
-      }));
-    } else {
-      // Handle case where locations are not passed (e.g., direct navigation or error)
-      // Maybe show an alert and navigate back, or require user to go back to Home
-      Alert.alert(
-        "Location Error",
-        "Pickup and Dropoff locations not provided. Please go back and select them.",
-        [{text: "OK", onPress: () => navigation.goBack()}],
-      );
-    }
-  }, [passedPickupLocation, passedDropOffLocation, setRideState, navigation]);
 
   const [compare, setCompare] = useState(false);
   const [isPayment, setIsPayment] = useState(false);
@@ -128,6 +101,96 @@ const BookRide: React.FC<BookRideProps> = ({route}) => {
       }
     >(),
   );
+
+  // This useEffect will now control whether the main component logic proceeds
+  useEffect(() => {
+    if (passedPickupLocation && passedDropOffLocation) {
+      setIsEssentialDataReady(true);
+    } else {
+      setIsEssentialDataReady(false); // Ensure it's false if data is missing
+      Alert.alert(
+        "Location Error",
+        "Pickup and Dropoff locations not provided. Please go back and select them.",
+        [{text: "OK", onPress: () => navigation.goBack()}],
+      );
+    }
+  }, [passedPickupLocation, passedDropOffLocation, navigation]);
+
+  // This useEffect now depends on isEssentialDataReady or more directly on the presence of location data.
+  // It will initialize rideState once locations are confirmed to be available.
+  useEffect(() => {
+    // Only proceed if essential data (locations) is ready
+    if (isEssentialDataReady && passedPickupLocation && passedDropOffLocation) {
+      setRideState(prev => ({
+        ...prev,
+        pickupLocation: {
+          latitude: String(passedPickupLocation.coordinates.lat),
+          longitude: String(passedPickupLocation.coordinates.lng),
+          address: passedPickupLocation.address,
+        },
+        dropOffLocation: {
+          latitude: String(passedDropOffLocation.coordinates.lat),
+          longitude: String(passedDropOffLocation.coordinates.lng),
+          address: passedDropOffLocation.address,
+        },
+        selectedRideType: undefined, // Reset these when new locations are set
+        fare: undefined,
+        payment: undefined,
+        status: "configuring_ride", // Or an appropriate initial status
+      }));
+    }
+  }, [
+    isEssentialDataReady,
+    passedPickupLocation,
+    passedDropOffLocation,
+    setRideState,
+  ]);
+
+  // The useEffect for socketRideState, and any other useEffects, useState, etc.
+  // should be here or after, as long as they are before the conditional return below.
+  // Example: The problematic useEffect from your log for socketRideState:
+  useEffect(() => {
+    if (
+      socketRideState.status === "pending_bids" &&
+      socketRideState.bidding_room_id
+    ) {
+      setRideState(prev => ({
+        ...prev,
+        status: "PENDING_BIDS",
+        quotationRequestId: socketRideState.bidding_room_id,
+      }));
+      navigation.navigate("ViewBidsScreen", {
+        quotationId: socketRideState.bidding_room_id,
+      });
+    } else if (
+      socketRideState.status === "error" &&
+      rideState.status === "QUOTATION_REQUEST_INITIATED" // Check if error is related to current quotation attempt
+    ) {
+      Alert.alert(
+        "Quotation Error",
+        socketRideState.errorMessage || "Failed to submit quotation request.",
+      );
+      setRideState(prev => ({
+        ...prev,
+        status: "error",
+        errorMessage:
+          socketRideState.errorMessage || "Failed to submit quotation request.",
+      }));
+    }
+  }, [
+    socketRideState,
+    navigation,
+    setRideState,
+    rideState.status, // Added rideState.status as a dependency
+  ]);
+
+  // CONDITIONAL EARLY RETURN: If essential data is not ready, render nothing or a loader.
+  // This MUST come AFTER ALL hook declarations.
+  if (!isEssentialDataReady) {
+    // You can return null or a loading indicator.
+    // Returning null is fine if the alert and navigation.goBack() handle user feedback.
+    return null;
+  }
 
   // Function to handle ride type selection
   const handleRideSelection = (rideName: string, price: number) => {
@@ -212,22 +275,21 @@ const BookRide: React.FC<BookRideProps> = ({route}) => {
     });
   };
 
-  // Function to handle ride confirmation
-  const handleConfirmRide = () => {
+  // Function to handle ride confirmation - RENAMED
+  const handleRequestQuotes = () => {
     if (!isSocketConnected) {
       Alert.alert(
         "Connection Error",
         "Not connected to the server. Please check your internet connection or try again later.",
       );
+      setRideState(prev => ({
+        ...prev,
+        status: "error",
+        errorMessage: "Connection failed",
+      }));
       return;
     }
 
-    if (paymentMethod === null) {
-      Alert.alert("Payment Method", "Please select a payment method.");
-      return;
-    }
-
-    // Locations are now expected to be in rideState, set by useEffect from route.params
     if (
       !rideState.pickupLocation?.address ||
       !rideState.dropOffLocation?.address ||
@@ -241,11 +303,18 @@ const BookRide: React.FC<BookRideProps> = ({route}) => {
         "Pickup and drop-off locations are missing or incomplete. Please go back to Home.",
         [{text: "OK", onPress: () => navigation.goBack()}],
       );
+      setRideState(prev => ({
+        ...prev,
+        status: "error",
+        errorMessage: "Location data missing",
+      }));
       return;
     }
 
-    // rideState already contains the correct pickup and dropOff locations with lat/lng
-    const rideDataForServer: RideRequest = {
+    const riderId = "current-rider-id"; // FIXME: Replace with actual rider ID from auth/user state
+
+    const quotationDataForServer: QuotationRequestPayload = {
+      riderId: riderId,
       pickupLocation: {
         latitude: Number(rideState.pickupLocation.latitude),
         longitude: Number(rideState.pickupLocation.longitude),
@@ -256,61 +325,36 @@ const BookRide: React.FC<BookRideProps> = ({route}) => {
         longitude: Number(rideState.dropOffLocation.longitude),
         address: rideState.dropOffLocation.address || "",
       },
-      name: "Rider Name Placeholder", // Consider getting actual user name
-      phone: "0000000000", // Consider getting actual user phone
-      fare: {
-        baseFare: rideState.fare?.baseFare || 0,
-        finalFare: rideState.fare?.finalFare || rideState.fare?.baseFare || 0,
-        breakdown: {
-          baseCost:
-            rideState.fare?.breakdown?.baseCost ||
-            rideState.fare?.baseFare ||
-            0,
-          serviceFee: rideState.fare?.breakdown?.serviceFee || 0,
-          taxes: rideState.fare?.breakdown?.taxes || 0,
-        },
-      },
-      bidAmount: rideState.fare?.baseFare || 0,
-      status: "pending",
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
+      requestedAt: new Date().toISOString(),
     };
 
     console.log(
-      "Attempting to create ride request with data from rideState:",
-      rideDataForServer,
+      "Attempting to submit quotation request with data:",
+      quotationDataForServer,
     );
-    createRideRequest(rideDataForServer);
 
-    // The UI should now react to changes in socketRideState.status
-    // e.g., 'creating_request', then 'pending_bids' or 'error'
-    // The original logic for showing random local drivers and their animations is bypassed.
-    // Navigation or UI changes to show bids will be handled based on socketRideState.
-    // For example, navigate to SearchDriver screen when status becomes 'pending_bids'
+    if (!submitQuotationRequest) {
+      Alert.alert("Error", "submitQuotationRequest not available. Dev issue.");
+      setRideState(prev => ({
+        ...prev,
+        status: "error",
+        errorMessage: "Quotation submission system error",
+      }));
+      return;
+    }
 
-    // Original logic commented out:
-    /*
-    const randomDrivers = getRandomDrivers();
-    const enhancedDrivers: AnimatedDriver[] = randomDrivers.map(driver => ({
-      ...driver,
-      animationId: `driver-${driver.id}-${Date.now()}-${Math.random()
-        .toString(36)
-        .substring(2, 9)}`,
-      visible: false,
-      exiting: false,
-    }));
-    setAnimatedDrivers(enhancedDrivers);
     setRideState(prev => ({
       ...prev,
-      availableDrivers: randomDrivers,
-      status: "searching", // This status in rideAtom might need to align with socketRideState.status
+      status: "QUOTATION_REQUEST_INITIATED", // Set pre-socket call status
+      quotationRequestId: undefined, // Will be set by socket event ack
+      errorMessage: undefined, // Clear previous errors
     }));
-    setShowDrivers(true);
-    setIsPayment(false);
-    enhancedDrivers.forEach((driver, index) => {
-      // ... animation logic ...
-    });
-    */
+
+    submitQuotationRequest(quotationDataForServer);
+
+    // Navigation to ViewBidsScreen will be handled by a useEffect hook
+    // monitoring socketRideState.status (e.g., 'pending_bids') and
+    // socketRideState.bidding_room_id (as quotationId).
   };
 
   // Render a single driver item with animations
@@ -376,33 +420,22 @@ const BookRide: React.FC<BookRideProps> = ({route}) => {
     );
   };
 
-  // Check if locations were successfully passed and set in rideState
-  // If not, render a message or redirect, rather than the full UI without locations.
-  if (
-    !rideState.pickupLocation?.address ||
-    !rideState.dropOffLocation?.address ||
-    !passedPickupLocation ||
-    !passedDropOffLocation
-  ) {
-    return (
-      <View style={styles.containerAlteredForMessage}>
-        <Text style={styles.headerText}>Loading Location Details...</Text>
-        <Text style={styles.messageText}>
-          If this persists, please go back and re-select locations on the Home
-          screen.
-        </Text>
-        <TouchableOpacity
-          onPress={() => navigation.goBack()}
-          style={styles.goBackButton}>
-          <Text style={styles.goBackButtonText}>Go Back</Text>
-        </TouchableOpacity>
-      </View>
-    );
-  }
-
   // Destructure for easier use in MapViewDirections after null check above
-  const finalPickupCoords = passedPickupLocation.coordinates;
-  const finalDropOffCoords = passedDropOffLocation.coordinates;
+  const finalPickupCoords = passedPickupLocation!.coordinates;
+  const finalDropOffCoords = passedDropOffLocation!.coordinates;
+
+  console.log(
+    "[BookRide] Final Pickup Coords:",
+    JSON.stringify(finalPickupCoords),
+  );
+  console.log(
+    "[BookRide] Final Dropoff Coords:",
+    JSON.stringify(finalDropOffCoords),
+  );
+  console.log(
+    "[BookRide] Google Maps API Key Used:",
+    GOOGLE_MAPS_API_KEY_BOOKRIDE,
+  );
 
   return (
     <ScrollView
@@ -411,10 +444,11 @@ const BookRide: React.FC<BookRideProps> = ({route}) => {
       <View style={styles.container}>
         <View style={styles.locationSummaryContainer}>
           <Text style={styles.locationSummaryText}>
-            Pickup: {rideState.pickupLocation.address}
+            Pickup: {rideState.pickupLocation?.address || "Fetching address..."}
           </Text>
           <Text style={styles.locationSummaryText}>
-            Drop-off: {rideState.dropOffLocation.address}
+            Drop-off:{" "}
+            {rideState.dropOffLocation?.address || "Fetching address..."}
           </Text>
         </View>
 
@@ -424,10 +458,12 @@ const BookRide: React.FC<BookRideProps> = ({route}) => {
             provider={PROVIDER_GOOGLE}
             style={styles.map}
             initialRegion={{
-              latitude: finalPickupCoords.lat,
-              longitude: finalPickupCoords.lng,
-              latitudeDelta: 0.0922,
-              longitudeDelta: 0.0421,
+              latitude: (finalPickupCoords.lat + finalDropOffCoords.lat) / 2,
+              longitude: (finalPickupCoords.lng + finalDropOffCoords.lng) / 2,
+              latitudeDelta:
+                Math.abs(finalPickupCoords.lat - finalDropOffCoords.lat) * 2,
+              longitudeDelta:
+                Math.abs(finalPickupCoords.lng - finalDropOffCoords.lng) * 2,
             }}>
             <Marker
               coordinate={{
@@ -435,7 +471,9 @@ const BookRide: React.FC<BookRideProps> = ({route}) => {
                 longitude: finalPickupCoords.lng,
               }}
               title="Pickup Location"
-              description={rideState.pickupLocation.address}
+              description={
+                rideState.pickupLocation?.address || "Fetching address..."
+              }
               pinColor="green"
             />
             <Marker
@@ -444,42 +482,59 @@ const BookRide: React.FC<BookRideProps> = ({route}) => {
                 longitude: finalDropOffCoords.lng,
               }}
               title="Drop-off Location"
-              description={rideState.dropOffLocation.address}
+              description={
+                rideState.dropOffLocation?.address || "Fetching address..."
+              }
               pinColor="red"
             />
-            {GOOGLE_MAPS_API_KEY_BOOKRIDE !==
-              "YOUR_GOOGLE_MAPS_API_KEY_WITH_DIRECTIONS_ENABLED" && (
-              <MapViewDirections
-                origin={{
-                  latitude: finalPickupCoords.lat,
-                  longitude: finalPickupCoords.lng,
-                }}
-                destination={{
-                  latitude: finalDropOffCoords.lat,
-                  longitude: finalDropOffCoords.lng,
-                }}
-                apikey={GOOGLE_MAPS_API_KEY_BOOKRIDE}
-                strokeWidth={4}
-                strokeColor="#007AFF"
-                mode="DRIVING"
-                onReady={result => {
-                  mapRef.current?.fitToCoordinates(result.coordinates, {
-                    edgePadding: {
-                      right: screenWidth / 20,
-                      bottom: screenHeight / 20,
-                      left: screenWidth / 20,
-                      top: screenHeight / 20,
-                    },
-                  });
-                }}
-                onError={errorMessage => {
-                  console.error(
-                    "MapViewDirections Error (BookRide): ",
-                    errorMessage,
-                  );
-                }}
-              />
-            )}
+            {rideState.pickupLocation?.latitude &&
+              rideState.dropOffLocation?.latitude &&
+              rideState.pickupLocation.longitude &&
+              rideState.dropOffLocation.longitude &&
+              (() => {
+                const origin = {
+                  latitude: parseFloat(rideState.pickupLocation!.latitude),
+                  longitude: parseFloat(rideState.pickupLocation!.longitude),
+                };
+                const destination = {
+                  latitude: parseFloat(rideState.dropOffLocation!.latitude),
+                  longitude: parseFloat(rideState.dropOffLocation!.longitude),
+                };
+                console.log(
+                  "[BookRide] Rendering MapViewDirections with Origin:",
+                  origin,
+                  "Destination:",
+                  destination,
+                  "API Key used:",
+                  GOOGLE_MAPS_API_KEY_BOOKRIDE.substring(0, 10) + "...",
+                );
+                return (
+                  <MapViewDirections
+                    origin={origin}
+                    destination={destination}
+                    apikey={GOOGLE_MAPS_API_KEY_BOOKRIDE}
+                    strokeWidth={4}
+                    strokeColor="#007AFF"
+                    mode="DRIVING"
+                    onReady={result => {
+                      mapRef.current?.fitToCoordinates(result.coordinates, {
+                        edgePadding: {
+                          right: screenWidth / 20,
+                          bottom: screenHeight / 20,
+                          left: screenWidth / 20,
+                          top: screenHeight / 20,
+                        },
+                      });
+                    }}
+                    onError={errorMessage => {
+                      console.error(
+                        "MapViewDirections Error (BookRide): ",
+                        errorMessage,
+                      );
+                    }}
+                  />
+                );
+              })()}
           </MapView>
         </View>
 
@@ -590,10 +645,10 @@ const BookRide: React.FC<BookRideProps> = ({route}) => {
                 </RadioGroup>
                 <View style={{marginTop: 15}}>
                   <CustomButton
-                    title="Confirm Ride"
+                    title="Request Quotes"
                     status={paymentMethod !== null ? "primary" : "disabled"}
                     size="medium"
-                    onPress={handleConfirmRide}
+                    onPress={handleRequestQuotes}
                     disabled={paymentMethod === null}
                   />
                 </View>
@@ -605,9 +660,17 @@ const BookRide: React.FC<BookRideProps> = ({route}) => {
           )}
         </View>
       </View>
-      {socketRideState?.status === "creating_request" && (
+      {(rideState.status === "creating_request" ||
+        rideState.status === "QUOTATION_REQUEST_INITIATED" ||
+        socketRideState?.status === "creating_request" || // Retain for direct ride if ever used
+        socketRideState?.status === "creating_quotation_request") && (
         <View style={styles.loadingOverlay}>
-          <Text style={styles.loadingText}>Creating your ride request...</Text>
+          <Text style={styles.loadingText}>
+            {rideState.status === "QUOTATION_REQUEST_INITIATED" ||
+            socketRideState?.status === "creating_quotation_request"
+              ? "Requesting quotes..."
+              : "Creating your ride request..."}
+          </Text>
         </View>
       )}
     </ScrollView>
