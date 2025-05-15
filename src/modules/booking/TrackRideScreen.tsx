@@ -33,6 +33,9 @@ const TrackRideScreen = () => {
   const route = useRoute<TrackRideScreenRouteProp>();
   const {currentRideState, driverLocation, isConnected} = useSocket();
 
+  // Extract new params for fare
+  const {acceptedAmount, acceptedCurrency} = route.params;
+
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -117,7 +120,10 @@ const TrackRideScreen = () => {
             "N/A"}
         </Text>
         <Text style={styles.infoText}>
-          Fare: {route.params.rideDetails?.fare?.baseFare || "N/A"}
+          Fare:{" "}
+          {typeof acceptedAmount === "number" && acceptedCurrency
+            ? `${acceptedAmount.toFixed(2)} ${acceptedCurrency}`
+            : "N/A"}
         </Text>
       </View>
 
@@ -127,10 +133,13 @@ const TrackRideScreen = () => {
           Name: {route.params.selectedDriverInfo?.name || "N/A"}
         </Text>
         <Text style={styles.infoText}>
-          Vehicle: {route.params.selectedDriverInfo?.vehicleModel || "N/A"}
+          Vehicle: {route.params.selectedDriverInfo?.vehicle || "N/A"}
         </Text>
         <Text style={styles.infoText}>
-          Rating: {route.params.selectedDriverInfo?.rating || "N/A"}
+          Rating:{" "}
+          {route.params.selectedDriverInfo?.rating
+            ? route.params.selectedDriverInfo.rating.toFixed(1) + "★"
+            : "N/A"}
         </Text>
       </View>
 

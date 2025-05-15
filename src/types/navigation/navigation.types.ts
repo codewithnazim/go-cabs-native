@@ -1,5 +1,5 @@
 import {NativeStackNavigationProp} from "@react-navigation/native-stack";
-import {RideRequest} from "../ride/types/ride.types";
+import {RideRequest, QuotationRequestPayload} from "../ride/types/ride.types";
 import {NavigatorScreenParams} from "@react-navigation/native";
 
 export type UserStackParamList = {
@@ -59,7 +59,9 @@ export type BookingStackParamList = {
     rideId: string;
     active_ride_room_id: string;
     selectedDriverInfo: any;
-    rideDetails: RideRequest | undefined;
+    rideDetails?: QuotationRequestPayload | RideRequest;
+    acceptedAmount?: number;
+    acceptedCurrency?: string;
   };
   BookingDetails: undefined;
   CallDriver: undefined;
@@ -68,6 +70,7 @@ export type BookingStackParamList = {
   AcceptRide: undefined;
   RideCompleteDriver: undefined;
   UpcomingRideInfo: undefined;
+  ViewBidsScreen: {quotationId: string};
 };
 
 export type AuthStackParamList = {

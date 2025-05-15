@@ -209,6 +209,94 @@ io.on("connection", socket => {
     },
   );
 
+  // New: Rider submits a quotation request
+  socket.on(
+    "rider_submit_quotation_request",
+    (
+      quotationData: any /* Consider creating/using a QuotationRequestPayload type here */,
+    ) => {
+      try {
+        console.log(
+          `[Server] Received rider_submit_quotation_request from ${socket.id}:`,
+          JSON.stringify(quotationData),
+        );
+
+        // Assuming quotationData matches QuotationRequestPayload from rider app
+        // It should contain: riderId, pickupLocation, dropoffLocation, requestedAt, etc.
+
+        const quotationId = `quot_${Date.now()}_${Math.random()
+          .toString(36)
+          .substring(2, 7)}`;
+        const bidding_room_id = quotationId; // For quotations, bidding_room_id can be the quotationId
+
+        // Store the quotation request
+        // Adapting activeRideRequests for now. Ideally, a separate map or unified type might be better.
+        activeRideRequests.set(bidding_room_id, {
+          rideId: quotationId, // Using quotationId as the main identifier
+          rideDetails: quotationData, // This is the QuotationRequestPayload
+          riderSocketId: socket.id,
+          bids: new Map(),
+        });
+
+        socket.join(bidding_room_id);
+        if (!rooms.has(bidding_room_id)) {
+          rooms.set(bidding_room_id, new Set());
+        }
+        rooms.get(bidding_room_id)?.add(socket.id);
+        clients.get(socket.id)?.rooms.add(bidding_room_id);
+
+        console.log(
+          `[Server] Rider ${socket.id} created quotation request ${quotationId}, joined bidding room ${bidding_room_id}`,
+        );
+
+        // Acknowledge rider
+        socket.emit("quotation_request_created_ack", {
+          quotationId: quotationId,
+          bidding_room_id: bidding_room_id,
+          quotationDetails: quotationData, // Send back the original payload
+        });
+
+        // Construct payload for drivers (matching QuotationRequest type in driver app)
+        const quotationForDriverEvent = {
+          id: quotationId, // This is the quotationRequestId for the driver
+          riderId: quotationData.riderId, // From payload
+          userName: quotationData.userName, // Added: Rider's name
+          fareOffer: quotationData.fareOffer, // Added: Rider's offered fare
+          pickupLocation: quotationData.pickupLocation, // Directly from payload
+          dropoffLocation: quotationData.dropoffLocation, // Directly from payload
+          requestedAt: quotationData.requestedAt, // Directly from payload
+          preferredPaymentMethod: quotationData.preferredPaymentMethod, // Optional
+          vehicleType: quotationData.vehicleType, // Optional
+          // Add any other fields from QuotationRequestPayload that are relevant to QuotationRequest type
+        };
+
+        console.log(
+          "[Server] Emitting new_ride_to_bid_on with quotationForDriverEvent:",
+          JSON.stringify(quotationForDriverEvent),
+        );
+
+        // Broadcast to available drivers
+        io.to(DRIVERS_ROOM).emit("new_ride_to_bid_on", {
+          rideId: quotationId, // Top-level rideId for the event (can be same as quotationId)
+          bidding_room_id: bidding_room_id, // Top-level bidding_room_id
+          rideDetails: quotationForDriverEvent, // The structured QuotationRequest
+        });
+        console.log(
+          `[Server] Broadcasted new quotation ${quotationId} to ${DRIVERS_ROOM}`,
+        );
+      } catch (error) {
+        console.error(
+          "[Server] Error processing rider_submit_quotation_request:",
+          error,
+        );
+        socket.emit("quotation_request_error", {
+          message: "Failed to create quotation request.",
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    },
+  );
+
   // New: Driver submits a bid for a ride
   socket.on(
     "driver_submit_bid",
@@ -237,14 +325,20 @@ io.on("connection", socket => {
       );
 
       // Notify the rider about the new bid
+      console.log(
+        `[Server] Attempting to emit 'new_bid_for_your_ride' to rider ${rideRequest.riderSocketId} for quotation ${rideRequest.rideId}`,
+      );
       io.to(rideRequest.riderSocketId).emit("new_bid_for_your_ride", {
-        rideId: rideRequest.rideId,
+        rideId: rideRequest.rideId, // This is the quotationId
         bidding_room_id,
         driverSocketId: socket.id,
         bidDetails,
         driverInfo,
       });
-      socket.emit("bid_submission_ack", {rideId: rideRequest.rideId});
+      // Send ack to driver, ensuring quotationRequestId is used as expected by driver client
+      socket.emit("bid_submission_ack", {
+        quotationRequestId: rideRequest.rideId,
+      });
     },
   );
 
@@ -339,6 +433,12 @@ io.on("connection", socket => {
         rideId,
         rideDetails, // Send full ride details to driver
         // riderInfo: { id: riderSocketId /* add more rider details if available */ },
+        acceptedBidAmount: selectedBid.bidDetails.amount, // Added: Accepted bid amount
+        acceptedBidCurrency: selectedBid.bidDetails.currency, // Added: Accepted bid currency
+        // Pass along the full original bid details as well, could be useful for driver
+        acceptedBidDetails: selectedBid.bidDetails,
+        // driverInfo is already known by the driver, but can be included if needed
+        // driverInfo: selectedBid.driverInfo
       });
 
       // Notify other bidders and clean up bidding room

@@ -6,6 +6,7 @@ import {
   // NewBidData,       // Not directly used in useSocket state, but good to have if needed
 } from "../services/socket/broadcast/broadcastSocket";
 import {RideRequest} from "../types/ride/types/ride.types";
+import {QuotationRequestPayload} from "../types/ride/types/ride.types";
 
 // Removed local re-declarations of CurrentRideProgress and Bid
 
@@ -19,12 +20,15 @@ const initialRideProgressState: CurrentRideProgress = {
   rideId: undefined,
   bidding_room_id: undefined,
   active_ride_room_id: undefined,
-  rideDetails: undefined,
+  requestDetails: undefined,
   bids: new Map<string, Bid>(),
   selectedDriverInfo: undefined,
   status: "idle",
   errorMessage: undefined,
 };
+
+// Define the interface for the current ride state
+export interface SocketRideState extends CurrentRideProgress {}
 
 export const useSocket = () => {
   const [isConnected, setIsConnected] = useState(() => {
@@ -37,8 +41,12 @@ export const useSocket = () => {
     return initialStatus.socketId;
   });
   // currentRideState is now guaranteed to be CurrentRideProgress, not null
-  const [currentRideState, setCurrentRideState] = useState<CurrentRideProgress>(
-    socketClient.getCurrentRideProgress() ?? initialRideProgressState,
+  const [currentRideState, setCurrentRideState] = useState<SocketRideState>(
+    () =>
+      socketClient.getCurrentRideProgress() || {
+        bids: new Map(),
+        status: "idle",
+      },
   );
 
   const [driverLocation, setDriverLocation] = useState<any | null>(null);
@@ -67,8 +75,22 @@ export const useSocket = () => {
       );
     };
 
+    const handleConnectError = (error: any) => {
+      console.error(
+        "[useSocket] Received 'connect_error' event. Error:",
+        error,
+      );
+      setIsConnected(false);
+      setSocketId(null);
+      setCurrentRideState(initialRideProgressState);
+    };
+
     // socketClient's "ride_progress_update" event should always pass a non-null CurrentRideProgress object.
     const handleRideProgressUpdate = (progress: CurrentRideProgress) => {
+      console.log(
+        "[useSocket] Received ride_progress_update from broadcastSocket:",
+        progress,
+      );
       setCurrentRideState(progress);
     };
 
@@ -78,6 +100,7 @@ export const useSocket = () => {
 
     socketClient.on("connect", handleConnect);
     socketClient.on("disconnect", handleDisconnect);
+    socketClient.on("connect_error", handleConnectError);
     socketClient.on("ride_progress_update", handleRideProgressUpdate);
     socketClient.on("driver_location_updated", handleDriverLocation);
 
@@ -112,6 +135,7 @@ export const useSocket = () => {
     return () => {
       socketClient.off("connect", handleConnect);
       socketClient.off("disconnect", handleDisconnect);
+      socketClient.off("connect_error", handleConnectError);
       socketClient.off("ride_progress_update", handleRideProgressUpdate);
       socketClient.off("driver_location_updated", handleDriverLocation);
     };
@@ -140,6 +164,17 @@ export const useSocket = () => {
       socketClient.createRideRequest(rideData);
     },
     [isConnected],
+  );
+
+  const submitQuotationRequest = useCallback(
+    (quotationData: QuotationRequestPayload) => {
+      console.log(
+        "[useSocket] submitQuotationRequest called. Current connection status:",
+        isConnected,
+      );
+      socketClient.submitQuotationRequest(quotationData);
+    },
+    [isConnected, socketClient],
   );
 
   // selectDriver in broadcastSocket.ts takes selectedDriverSocketId (string)
@@ -178,6 +213,7 @@ export const useSocket = () => {
     connect,
     disconnect,
     createRideRequest,
+    submitQuotationRequest,
     selectDriver,
     notifyRideCompleted,
     getBids,
