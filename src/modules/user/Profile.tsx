@@ -124,6 +124,11 @@ const profileListItems = [
     icon: "lock-outline",
   },
   {
+    title: "Scan And Pay",
+    path: "ScanAndPay" as keyof ProfileStackParamList,
+    icon: "phone-call",
+  },
+  {
     title: "Emergency contact",
     path: "EmergencyContact" as keyof ProfileStackParamList,
     icon: "phone-call",

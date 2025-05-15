@@ -22,6 +22,7 @@ export type DriverStackParamList = {
 
 export type ProfileStackParamList = {
   EditProfile: undefined;
+  ScanAndPay: undefined;
   SafetyCheck: undefined;
   TwoStepVerification: undefined;
   EmergencyContact: undefined;

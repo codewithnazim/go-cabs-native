@@ -28,8 +28,8 @@ const Login = () => {
   const isFirstRender = useRef(true);
 
   // const firebaseWebClientId = FIREBASE_WEB_CLIENT_ID;
-  const firebaseWebClientId = Config.FIREBASE_WEB_CLIENT_ID;
-  // const firebaseWebClientId = '1051726678978-go98d67mjjhi39t7326u3gbcpqn6sncb.apps.googleusercontent.com';
+  // const firebaseWebClientId = Config.FIREBASE_WEB_CLIENT_ID;
+  const firebaseWebClientId = '1051726678978-go98d67mjjhi39t7326u3gbcpqn6sncb.apps.googleusercontent.com';
   console.log("web client", firebaseWebClientId, Config.ENVIRONMENT);
   useEffect(() => {
     GoogleSignin.configure({

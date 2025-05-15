@@ -9,6 +9,7 @@ import ManageAccount from '../modules/profile/ManageAccount';
 import FAQs from '../modules/profile/FAQs';
 import PrivacyPolicy from '../modules/profile/PrivacyPolicy';
 import TermsAndCondition from '../modules/profile/TermsAndCondition';
+import ScanAndPay from '../modules/profile/ScanAndPay';
 
 const ProfileStack = createNativeStackNavigator();
 
@@ -16,6 +17,7 @@ const ProfileNavigator = () => {
     return (
         <ProfileStack.Navigator screenOptions={{ headerShown: false }}>
             <ProfileStack.Screen name="EditProfile" component={EditProfile} />
+            <ProfileStack.Screen name="ScanAndPay" component={ScanAndPay} />
             <ProfileStack.Screen name="SafetyCheck" component={SafetyCheck} />
             <ProfileStack.Screen name="TwoStepVerification" component={TwoStepVerification} />
             <ProfileStack.Screen name="EmergencyContact" component={EmergencyContact} />
