@@ -8,6 +8,7 @@ import {
   Dimensions,
   Alert,
   TextInput,
+  Switch,
 } from "react-native";
 import React, {useState, useRef, useEffect} from "react";
 import WebView from "react-native-webview";
@@ -18,6 +19,11 @@ import CarIcon from "../../../assets/images/icons/car.svg";
 import CardIcon from "../../../assets/images/icons/card.svg";
 import MetamaskIcon from "../../../assets/images/icons/metamask.svg";
 import CashIcon from "../../../assets/images/icons/cash.svg";
+import {fetchEvChargingStations} from "../../services/evCharging/evChargingService";
+import {
+  EvChargingStation,
+  EvChargingStationMarker,
+} from "../../types/evCharging/evChargingTypes";
 import CustomButton from "../../components/CustomButton";
 import Margin from "../../components/Margin";
 import {useRecoilState} from "recoil";
@@ -81,6 +87,10 @@ const BookRide: React.FC<BookRideProps> = ({route}) => {
   const [paymentMethod, setPaymentMethod] = useState<number | null>(null);
   const [showDrivers, setShowDrivers] = useState(false);
   const [animatedDrivers, setAnimatedDrivers] = useState<AnimatedDriver[]>([]);
+  const [showChargingStations, setShowChargingStations] = useState(true);
+  const [chargingStations, setChargingStations] = useState<
+    EvChargingStationMarker[]
+  >([]);
 
   // Animation references - using a Map for better tracking by ID
   const animationsMap = useRef(
@@ -451,6 +461,78 @@ const BookRide: React.FC<BookRideProps> = ({route}) => {
     }
   }, [isEssentialDataReady, finalPickupCoords, finalDropOffCoords]);
 
+  // Function to handle fetching EV charging stations
+  const handleFetchChargingStations = async (
+    latitude: number,
+    longitude: number,
+    distance: number,
+  ) => {
+    try {
+      const stations = await fetchEvChargingStations(
+        latitude,
+        longitude,
+        distance,
+      );
+
+      // Transform API response to marker format
+      const stationMarkers: EvChargingStationMarker[] = stations.map(
+        station => {
+          // Extract connection types
+          const connectionTypes = station.Connections.filter(
+            conn => conn.ConnectionType?.Title,
+          ).map(conn => conn.ConnectionType!.Title);
+
+          // Determine if station is operational
+          const isOperational = station.StatusType?.IsOperational ?? true;
+
+          // Get the highest power rating from connections
+          const highestPowerKW = station.Connections.reduce(
+            (max, conn) =>
+              conn.PowerKW && conn.PowerKW > max ? conn.PowerKW : max,
+            0,
+          );
+
+          return {
+            id: station.ID,
+            latitude: station.AddressInfo.Latitude,
+            longitude: station.AddressInfo.Longitude,
+            name: station.AddressInfo.Title || `Charging Station ${station.ID}`,
+            address: [
+              station.AddressInfo.AddressLine1,
+              station.AddressInfo.Town,
+              station.AddressInfo.StateOrProvince,
+              station.AddressInfo.Postcode,
+            ]
+              .filter(Boolean)
+              .join(", "),
+            connectionTypes:
+              connectionTypes.length > 0 ? connectionTypes : ["Unknown"],
+            isOperational,
+            powerKW: highestPowerKW > 0 ? highestPowerKW : undefined,
+            numberOfPoints: station.NumberOfPoints,
+            operator: station.OperatorInfo?.Title,
+          };
+        },
+      );
+
+      setChargingStations(stationMarkers);
+
+      // Send the stations to the WebView
+      if (webViewRef.current) {
+        const script = `
+          if (window.addChargingStations) {
+            window.addChargingStations(${JSON.stringify(stationMarkers)});
+          } else {
+            console.warn('addChargingStations not ready in WebView');
+          }
+        `;
+        webViewRef.current.injectJavaScript(script);
+      }
+    } catch (error) {
+      console.error("[BookRide] Error fetching charging stations:", error);
+    }
+  };
+
   return (
     <ScrollView
       style={styles.mainScrollContainer}
@@ -466,6 +548,24 @@ const BookRide: React.FC<BookRideProps> = ({route}) => {
               Drop-off:{" "}
               {rideState.dropOffLocation?.address || "Fetching address..."}
             </Text>
+            <View style={styles.chargingToggleContainer}>
+              <Text style={styles.switcText}>Show EV Charging Stations</Text>
+              <Switch
+                value={showChargingStations}
+                onValueChange={value => {
+                  setShowChargingStations(value);
+                  if (webViewRef.current) {
+                    webViewRef.current.injectJavaScript(`
+                      if (window.toggleChargingStations) {
+                        window.toggleChargingStations(${value});
+                      }
+                    `);
+                  }
+                }}
+                trackColor={{false: "#767577", true: "#81b0ff"}}
+                thumbColor={showChargingStations ? primaryColor : "#f4f3f4"}
+              />
+            </View>
           </View>
 
           <View style={styles.mapContainer}>
@@ -483,11 +583,24 @@ const BookRide: React.FC<BookRideProps> = ({route}) => {
                 console.warn("[BookRide] WebView error: ", nativeEvent);
               }}
               onMessage={event => {
-                // Handle messages from WebView if needed
-                console.log(
-                  "[BookRide] Message from WebView:",
-                  event.nativeEvent.data,
-                ); // Keep this if message passing is planned
+                // Handle messages from WebView
+                try {
+                  const data = JSON.parse(event.nativeEvent.data);
+                  console.log("[BookRide] Message from WebView:", data);
+
+                  if (data.type === "fetchChargingStations") {
+                    handleFetchChargingStations(
+                      data.latitude,
+                      data.longitude,
+                      data.distance,
+                    );
+                  }
+                } catch (error) {
+                  console.error(
+                    "[BookRide] Error parsing WebView message:",
+                    error,
+                  );
+                }
               }}
               javaScriptEnabled={true}
               domStorageEnabled={true}
@@ -732,6 +845,15 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontSize: 14,
     fontFamily: "Montserrat-SemiBold",
+  },
+  chargingToggleContainer: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginTop: 10,
+    paddingTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: "rgba(255, 255, 255, 0.1)",
   },
   webview: {
     width: "100%",
