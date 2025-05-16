@@ -51,6 +51,8 @@
         let pickupLocation = null;
         let destinationLocation = null;
         let activeMarkers = [];
+        let driverTrackingMarker = null; // For driver's marker in tracking view
+        let driverRouteLayerId = 'driver-route'; // Specific ID for driver tracking route
 
         window.setLocationsAndCalculateRoute = function (pLng, pLat, dLng, dLat) {
             pickupLocation = [parseFloat(pLng), parseFloat(pLat)];
@@ -70,6 +72,17 @@
             if (map.getSource('route')) map.removeSource('route');
             activeMarkers.forEach(marker => marker.remove());
             activeMarkers = [];
+            // Also clear driver tracking specific layers if they exist
+            clearDriverTrackingLayer();
+        }
+
+        function clearDriverTrackingLayer() {
+            if (driverTrackingMarker) {
+                driverTrackingMarker.remove();
+                driverTrackingMarker = null;
+            }
+            if (map.getLayer(driverRouteLayerId)) map.removeLayer(driverRouteLayerId);
+            if (map.getSource(driverRouteLayerId)) map.removeSource(driverRouteLayerId);
         }
 
         function addMarkers() {
@@ -89,11 +102,12 @@
             });
 
             map.on('load', () => {
-                document.getElementById('info').innerText = 'Waiting for location data...';
+                document.getElementById('info').innerText = 'WebView v4: Map loaded. Waiting for location data from app...';
                 if (pickupLocation && destinationLocation) {
-                    addMarkers();
-                    calculateAndDisplayRoute();
+                    // addMarkers();
+                    // calculateAndDisplayRoute();
                 }
+                signalNativeMapReady();
             });
             map.on('error', (e) => {
                 console.error('Mapbox GL error:', e.error ? e.error.message : e);
@@ -150,7 +164,96 @@
                 document.getElementById('info').innerText = 'Could not fetch route details.';
             }
         }
-        window.onload = initMap;
+
+        window.updateDriverTrackingView = async function (driverLng, driverLat, destLng, destLat) {
+            if (!map || !map.loaded()) {
+                console.warn("updateDriverTrackingView called before map is ready.");
+                // Optionally, store these and try again on map load, or rely on RN to recall
+                return;
+            }
+            document.getElementById('info').innerText = 'Updating driver and destination view...';
+
+            clearDriverTrackingLayer(); // Clear previous driver marker and route
+            // Note: We are not clearing general pickup/destination markers from activeMarkers here
+            // as they might be from a different context (e.g. initial booking screen)
+            // If this map instance is solely for tracking, you might merge clearing logic.
+
+            const driverCoords = [parseFloat(driverLng), parseFloat(driverLat)];
+            const destinationCoords = [parseFloat(destLng), parseFloat(destLat)];
+
+            // Add Driver Marker
+            driverTrackingMarker = new mapboxgl.Marker({ color: 'blue' })
+                .setLngLat(driverCoords)
+                .setPopup(new mapboxgl.Popup().setText("Driver"))
+                .addTo(map);
+
+            // Add Destination Marker (if not already shown by addMarkers, or use a different style)
+            // For simplicity, let's assume map.html might be used for different views.
+            // We can add a distinct destination marker for tracking if needed, or ensure it's updated.
+            // For now, let's re-add it to ensure it's present for this view.
+            const trackingDestMarker = new mapboxgl.Marker({ color: 'green' })
+                .setLngLat(destinationCoords)
+                .setPopup(new mapboxgl.Popup().setText("Destination"))
+                .addTo(map);
+            // We need a way to manage these markers if they are separate from activeMarkers
+            // For now, pushing to activeMarkers for cleanup, but this might need refinement
+            // depending on how map.html is reused.
+            activeMarkers.push(trackingDestMarker); // This will be cleared by clearMapLayersAndMarkers
+            // Or manage a separate list for tracking-specific markers.
+
+            // Fetch and display route from driver to destination
+            const coordinates = `${driverCoords.join(',')};${destinationCoords.join(',')}`;
+            const queryUrl = `https://api.mapbox.com/directions/v5/mapbox/driving/${coordinates}?steps=true&geometries=geojson&access_token=${mapboxgl.accessToken}`;
+
+            try {
+                const query = await fetch(queryUrl, { method: 'GET' });
+                const json = await query.json();
+
+                if (json.routes && json.routes.length) {
+                    const data = json.routes[0];
+                    const route = data.geometry.coordinates;
+                    const geojson = { type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates: route } };
+
+                    if (map.getSource(driverRouteLayerId)) {
+                        map.getSource(driverRouteLayerId).setData(geojson);
+                    } else {
+                        map.addLayer({
+                            id: driverRouteLayerId,
+                            type: 'line',
+                            source: { type: 'geojson', data: geojson },
+                            layout: { 'line-join': 'round', 'line-cap': 'round' },
+                            paint: { 'line-color': '#1e90ff', 'line-width': 6, 'line-opacity': 0.8 }
+                        });
+                    }
+                    const distance = (data.distance / 1000).toFixed(2);
+                    const duration = Math.round(data.duration / 60);
+                    document.getElementById('info').innerText = `Tracking: Driver to Destination - ${distance} km (${duration} mins)`;
+
+                    const bounds = new mapboxgl.LngLatBounds(driverCoords, driverCoords);
+                    bounds.extend(destinationCoords);
+                    for (const coord of route) bounds.extend(coord);
+                    map.fitBounds(bounds, { padding: 70 });
+
+                } else {
+                    const message = json.message || "Directions request failed for tracking";
+                    document.getElementById('info').innerText = `Tracking Route Error: ${message}`;
+                    console.error("Mapbox Directions API error (tracking):", json);
+                }
+            } catch (error) {
+                console.error("Error fetching tracking directions:", error);
+                document.getElementById('info').innerText = 'Could not fetch tracking route.';
+            }
+        };
+
+        function signalNativeMapReady() {
+            if (window.ReactNativeWebView && window.ReactNativeWebView.postMessage) {
+                window.ReactNativeWebView.postMessage(JSON.stringify({ type: "MAP_READY" }));
+            }
+        }
+
+        window.onload = function () {
+            initMap();
+        };
     </script>
 </body>
 
