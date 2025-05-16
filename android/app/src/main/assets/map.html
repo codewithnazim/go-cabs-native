@@ -135,7 +135,9 @@
                     }
                     const distance = (data.distance / 1000).toFixed(2);
                     const duration = Math.round(data.duration / 60);
-                    document.getElementById('info').innerText = `Distance: ${distance} km (${duration} mins) (v3)`;
+                    const co2EmissionFactor = 0.180; // kg CO2 per km (approx. 180g CO2/km for an average mid-sized petrol car)
+                    const co2Emissions = (parseFloat(distance) * co2EmissionFactor).toFixed(2); // in kg
+                    document.getElementById('info').innerText = `Distance: ${distance} km (${duration} mins) (v3)\nEst. CO2 Emissions: ${co2Emissions} kg`;
                     const bounds = new mapboxgl.LngLatBounds(route[0], route[0]);
                     for (const coord of route) bounds.extend(coord);
                     map.fitBounds(bounds, { padding: 60 });
