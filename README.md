@@ -1,6 +1,45 @@
-This is a new [**React Native**](https://reactnative.dev) project, bootstrapped using [`@react-native-community/cli`](https://github.com/react-native-community/cli).
+# 🚖 Go Cabs Rider App
 
-# Getting Started
+**Go Cabs** is a decentralized, 100% EV ride-hailing platform built to offer eco-friendly, transparent, and flexible transport solutions. This repository contains the **Rider App**, empowering users to book electric cab rides while interacting directly with drivers — no middlemen, no surge pricing.
+
+---
+
+# 🌟 Key Features
+
+- 🔍 **Easy Location Input**  
+  Enter pickup and drop locations using an intuitive Mapbox-powered interface.
+
+- ⚡ **Fare Bidding System**  
+  Say goodbye to rigid fares! Riders can negotiate prices directly with drivers in real time.
+
+- 💳 **Flexible Payments**  
+  Pay using integrated options — fiat, crypto, or Go Cabs scan-to-pay integration (via Aeon/Gaian).
+
+- 🌱 **All-Electric Rides**  
+  Contribute to a cleaner planet by riding only electric vehicles.
+
+- 🔗 **On-Chain Transparency**  
+  Ride data is logged immutably on-chain for full transparency using smart contract integrations.
+
+---
+
+# ⚙️ Tech Stack
+
+| Tech                      | Purpose                           |
+|---------------------------|-----------------------------------|
+| React Native + TypeScript | Cross-platform mobile development |
+| Firebase Auth             | Secure user authentication        |
+| Firebase Realtime DB      | Live ride tracking & messaging    |
+| Socket.IO                 | Real-time driver-rider sync       |
+| Mapbox API                | Location input & mapping          |
+| Anchor                    | On-chain escrow wallet (Solana)   |
+| OpenCharge API            | Charging infra integration        |
+
+---
+
+# 🚀 Getting Started (For Developers)
+
+This is a new [**React Native**](https://reactnative.dev) project, bootstrapped using [`@react-native-community/cli`](https://github.com/react-native-community/cli).
 
 > **Note**: Make sure you have completed the [Set Up Your Environment](https://reactnative.dev/docs/set-up-your-environment) guide before proceeding.
 
