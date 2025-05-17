@@ -37,6 +37,11 @@
 
 ---
 
+📱 Live Demo - https://www.youtube.com/watch?v=E5tLv4YkVqs&t=3s
+
+Waitlist: Join Now at https://www.gocabs.xyz/
+Telegram Community: https://t.me/GoCabsTG
+
 # 🚀 Getting Started (For Developers)
 
 This is a new [**React Native**](https://reactnative.dev) project, bootstrapped using [`@react-native-community/cli`](https://github.com/react-native-community/cli).
