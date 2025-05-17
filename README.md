@@ -39,7 +39,7 @@
 
 📱 Live Demo 
 🎥 Watch the full App demo on YouTube:  
-[![Watch Now](https://www.youtube.com/watch?v=E5tLv4YkVqs&t=3s/0.jpg)](https://www.youtube.com/watch?v=E5tLv4YkVqs&t=3s)  
+[![Watch Now](https://www.youtube.com/watch?v=E5tLv4YkVqs&t=3s/hqdefault.jpg)](https://www.youtube.com/watch?v=E5tLv4YkVqs&t=3s)  
 🔗 [Click here to watch](https://www.youtube.com/watch?v=E5tLv4YkVqs&t=3s)
 
 - Waitlist: Join Now at https://www.gocabs.xyz/
