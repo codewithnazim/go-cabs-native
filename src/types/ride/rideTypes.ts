@@ -31,7 +31,7 @@ export interface RideState {
     address?: string;
   };
   payment?: {
-    method: "metamask" | "credit" | "debit" | "cash";
+    method: "metamask" | "credit" | "debit" | "cash" | "Phantom";
     confirmed: boolean;
   };
   status?:
