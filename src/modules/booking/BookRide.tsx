@@ -5,9 +5,7 @@ import {
   ScrollView,
   TouchableOpacity,
   Animated,
-  Dimensions,
   Alert,
-  TextInput,
   Switch,
 } from "react-native";
 import React, {useState, useRef, useEffect} from "react";
@@ -16,12 +14,9 @@ import {backgroundPrimary, primaryColor} from "../../theme/colors";
 import {Radio, RadioGroup} from "@ui-kitten/components";
 import DullDivider from "../../components/DullDivider";
 import CarIcon from "../../../assets/images/icons/car.svg";
-import CardIcon from "../../../assets/images/icons/card.svg";
-import MetamaskIcon from "../../../assets/images/icons/metamask.svg";
-import CashIcon from "../../../assets/images/icons/cash.svg";
+import PhantomIcon from "../../../assets/images/icons/PhantomIcon.svg";
 import {fetchEvChargingStations} from "../../services/evCharging/evChargingService";
 import {
-  EvChargingStation,
   EvChargingStationMarker,
 } from "../../types/evCharging/evChargingTypes";
 import CustomButton from "../../components/CustomButton";
@@ -38,17 +33,18 @@ import {useSocket} from "../../hooks/useSocket";
 import {BookingStackParamList} from "../../types/navigation/navigation.types";
 import {Dimensions as RNDimensions} from "react-native";
 import {QuotationRequestPayload} from "../../types/ride/types/ride.types";
+import { calculatePriceByDistance } from "../../utils/ride/distance/calculateDistance";
 
 const {width: screenWidth, height: screenHeight} = RNDimensions.get("window");
 
-// Define the expected structure for selected locations
-interface SelectedLocation {
-  address: string;
-  coordinates: {
-    lat: number;
-    lng: number;
-  };
-}
+// // Define the expected structure for selected locations
+// interface SelectedLocation {
+//   address: string;
+//   coordinates: {
+//     lat: number;
+//     lng: number;
+//   };
+// }
 
 // Enhanced driver type with animation state
 interface AnimatedDriver extends Driver {
@@ -201,30 +197,12 @@ const BookRide: React.FC<BookRideProps> = ({route}) => {
       selectedRideType: rideName,
       fare: {baseFare: price},
     }));
-    setIsPayment(true);
   };
 
-  // Function to get random drivers - COMMENTED OUT as bids will come via socket
-  /*
-  const getRandomDrivers = () => {
-    const driverEntries = Object.entries(driverData); // driverData was imported, now removed
-    const shuffled = [...driverEntries].sort(() => 0.5 - Math.random());
-    const selectedDrivers = shuffled.slice(0, 4).map(([id, driver]) => ({
-      id,
-      ...(driver as object), // Assuming driver is an object, addressing linter hint if driverData was complex
-    }));
-    return selectedDrivers;
-  };
-  */
-
-  // Function to handle payment method selection
   const handlePaymentMethodChange = (index: number) => {
     setPaymentMethod(index);
+    const paymentTypes = ["metamask", "credit", "debit", "cash", "Phantom"] as const;
 
-    // Map payment method index to payment type
-    const paymentTypes = ["metamask", "credit", "debit", "cash"] as const;
-
-    // Update ride state with payment information
     setRideState(prev => ({
       ...prev,
       payment: {
@@ -232,49 +210,6 @@ const BookRide: React.FC<BookRideProps> = ({route}) => {
         confirmed: true,
       },
     }));
-  };
-
-  // Function to start exit animation for a driver
-  const startExitAnimation = (animationId: string) => {
-    const animationValues = animationsMap.current.get(animationId);
-    if (!animationValues) return;
-
-    // Mark this driver as exiting
-    setAnimatedDrivers(prev =>
-      prev.map(driver =>
-        driver.animationId === animationId
-          ? {...driver, exiting: true}
-          : driver,
-      ),
-    );
-
-    // Run the exit animation sequence
-    Animated.sequence([
-      Animated.timing(animationValues.translateX, {
-        toValue: -screenWidth,
-        duration: 500,
-        useNativeDriver: true,
-      }),
-      Animated.timing(animationValues.opacity, {
-        toValue: 0,
-        duration: 100,
-        useNativeDriver: true,
-      }),
-    ]).start(() => {
-      // After animation completes, remove the driver
-      setAnimatedDrivers(prev =>
-        prev.map(driver =>
-          driver.animationId === animationId
-            ? {...driver, visible: false}
-            : driver,
-        ),
-      );
-
-      // Clean up animation values
-      setTimeout(() => {
-        animationsMap.current.delete(animationId);
-      }, 100);
-    });
   };
 
   // Function to handle ride confirmation - RENAMED
@@ -353,18 +288,11 @@ const BookRide: React.FC<BookRideProps> = ({route}) => {
     }));
 
     submitQuotationRequest(quotationDataForServer);
-
-    // Navigation to ViewBidsScreen will be handled by a useEffect hook
-    // monitoring socketRideState.status (e.g., 'pending_bids') and
-    // socketRideState.bidding_room_id (as quotationId).
   };
 
   // Render a single driver item with animations
   const renderDriverItem = (driver: AnimatedDriver) => {
-    // Only render if driver is marked as visible
     if (!driver.visible) return null;
-
-    // Get animation values for this driver
     const animationValues = animationsMap.current.get(driver.animationId);
     if (!animationValues) return null;
 
@@ -422,18 +350,8 @@ const BookRide: React.FC<BookRideProps> = ({route}) => {
     );
   };
 
-  // Destructure for easier use in MapViewDirections after null check above
   const finalPickupCoords = passedPickupLocation!.coordinates;
   const finalDropOffCoords = passedDropOffLocation!.coordinates;
-
-  // console.log(
-  //   "[BookRide] Final Pickup Coords:",
-  //   JSON.stringify(finalPickupCoords),
-  // );
-  // console.log(
-  //   "[BookRide] Final Dropoff Coords:",
-  //   JSON.stringify(finalDropOffCoords),
-  // );
 
   const sendDataToWebView = () => {
     if (webViewRef.current && finalPickupCoords && finalDropOffCoords) {
@@ -445,11 +363,6 @@ const BookRide: React.FC<BookRideProps> = ({route}) => {
         }
       `;
       webViewRef.current.injectJavaScript(script);
-      // console.log(
-      //   "[BookRide] Sent coordinates to WebView:",
-      //   finalPickupCoords,
-      //   finalDropOffCoords,
-      // );
     }
   };
 
@@ -461,7 +374,6 @@ const BookRide: React.FC<BookRideProps> = ({route}) => {
     }
   }, [isEssentialDataReady, finalPickupCoords, finalDropOffCoords]);
 
-  // Function to handle fetching EV charging stations
   const handleFetchChargingStations = async (
     latitude: number,
     longitude: number,
@@ -532,6 +444,50 @@ const BookRide: React.FC<BookRideProps> = ({route}) => {
       console.error("[BookRide] Error fetching charging stations:", error);
     }
   };
+
+  const ridesData = [
+    {
+      name: "Taxi Go",
+      price: `₹ ${calculatePriceByDistance(
+        Number(rideState.pickupLocation?.latitude),
+        Number(rideState.pickupLocation?.longitude),
+        Number(rideState.dropOffLocation?.latitude),
+        Number(rideState.dropOffLocation?.longitude),
+        "TAXI",
+      ).toFixed(0)}`,
+      arrival: "Arrives in 15 mins",
+    },
+    {
+      name: "Moto Go",
+      price: `₹ ${calculatePriceByDistance(
+        Number(rideState.pickupLocation?.latitude),
+        Number(rideState.pickupLocation?.longitude),
+        Number(rideState.dropOffLocation?.latitude),
+        Number(rideState.dropOffLocation?.longitude),
+        "MOTO",
+      ).toFixed(0)}`,
+      arrival: "Arrives in 12 mins",
+    },
+  ];
+
+  // Function to get the price for the selected ride type
+  const getSelectedRidePrice = (): string => {
+    if (!rideState.selectedRideType || !rideState.pickupLocation || !rideState.dropOffLocation) {
+      return "₹ 0";
+    }
+
+    const rideType = rideState.selectedRideType.includes("Taxi") ? "TAXI" : "MOTO";
+    const price = calculatePriceByDistance(
+      Number(rideState.pickupLocation.latitude),
+      Number(rideState.pickupLocation.longitude),
+      Number(rideState.dropOffLocation.latitude),
+      Number(rideState.dropOffLocation.longitude),
+      rideType
+    );
+
+    return `₹ ${price.toFixed(0)}`;
+  };
+  
 
   return (
     <ScrollView
@@ -656,12 +612,15 @@ const BookRide: React.FC<BookRideProps> = ({route}) => {
                 <Margin margin={10} />
                 <View style={{paddingHorizontal: 20, marginTop: 5}}>
                   <CustomButton
-                    title="Continue Booking Your GO Ride"
-                    status="primary"
+                    // title="Continue Booking Your GO Ride"
+                    // status="primary"
+                    title={rideState.selectedRideType ? "Continue Booking" : "Select a Ride Type"}
+                    status={rideState.selectedRideType ? "primary" : "disabled"}
                     size="medium"
                     onPress={() => {
                       setIsPayment(true);
                     }}
+                    disabled={!rideState.selectedRideType}
                   />
                 </View>
               </>
@@ -677,7 +636,7 @@ const BookRide: React.FC<BookRideProps> = ({route}) => {
                   </TouchableOpacity>
                   <View style={styles.priceContainer}>
                     <Text style={styles.priceLabel}>Estimated Price:</Text>
-                    <Text style={styles.priceValue}>$25</Text>
+                    <Text style={styles.priceValue}>{getSelectedRidePrice()}</Text>
                   </View>
                   <RadioGroup
                     selectedIndex={paymentMethod !== null ? paymentMethod : -1}
@@ -685,12 +644,12 @@ const BookRide: React.FC<BookRideProps> = ({route}) => {
                     <Radio style={styles.option}>
                       {_evaProps => (
                         <>
-                          <Text style={styles.h3}>Metamask Wallet</Text>
-                          <MetamaskIcon width={25} height={25} />
+                          <Text style={styles.h3}>Phantom Wallet</Text>
+                          <PhantomIcon width={25} height={25} />
                         </>
                       )}
                     </Radio>
-                    <Radio style={styles.option}>
+                    {/* <Radio style={styles.option}>
                       {_evaProps => (
                         <>
                           <Text style={styles.h3}>Credit Card</Text>
@@ -713,7 +672,7 @@ const BookRide: React.FC<BookRideProps> = ({route}) => {
                           <CashIcon width={25} height={25} />
                         </>
                       )}
-                    </Radio>
+                    </Radio> */}
                   </RadioGroup>
                   <View style={{marginTop: 15}}>
                     <CustomButton
