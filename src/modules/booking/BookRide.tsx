@@ -16,9 +16,7 @@ import DullDivider from "../../components/DullDivider";
 import CarIcon from "../../../assets/images/icons/car.svg";
 import PhantomIcon from "../../../assets/images/icons/PhantomIcon.svg";
 import {fetchEvChargingStations} from "../../services/evCharging/evChargingService";
-import {
-  EvChargingStationMarker,
-} from "../../types/evCharging/evChargingTypes";
+import {EvChargingStationMarker} from "../../types/evCharging/evChargingTypes";
 import CustomButton from "../../components/CustomButton";
 import Margin from "../../components/Margin";
 import {useRecoilState} from "recoil";
@@ -32,8 +30,12 @@ import {
 import {useSocket} from "../../hooks/useSocket";
 import {BookingStackParamList} from "../../types/navigation/navigation.types";
 import {Dimensions as RNDimensions} from "react-native";
-import { calculatePriceByDistance } from "../../utils/ride/distance/calculateDistance";
-import { PhantomWalletService } from "../../services/payment/phantom/phantomWalletService";
+import {calculatePriceByDistance} from "../../utils/ride/distance/calculateDistance";
+// import {PhantomWalletService} from "../../services/payment/phantom/phantomWalletService";
+import {convertINRtoSOL} from "../../utils/currency/currencyConverter";
+import AppModal from "../../components/modals/AppModal";
+import { storage } from "../../store/mmkv/storage";
+import { STORAGE_KEYS } from "../../store/constants/storageKeys";
 
 const {width: screenWidth, height: screenHeight} = RNDimensions.get("window");
 
@@ -195,13 +197,23 @@ const BookRide: React.FC<BookRideProps> = ({route}) => {
     setRideState(prev => ({
       ...prev,
       selectedRideType: rideName,
-      fare: {baseFare: price},
+      fare: {
+        baseFare: price,
+        totalFare: price, // change this to what the driver will send the user as bid
+        currency: "INR",
+      },
     }));
   };
 
   const handlePaymentMethodChange = (index: number) => {
     setPaymentMethod(index);
-    const paymentTypes = ["metamask", "credit", "debit", "cash", "Phantom"] as const;
+    const paymentTypes = [
+      "metamask",
+      "credit",
+      "debit",
+      "cash",
+      "Phantom",
+    ] as const;
 
     setRideState(prev => ({
       ...prev,
@@ -212,9 +224,29 @@ const BookRide: React.FC<BookRideProps> = ({route}) => {
     }));
   };
 
-  // Function to handle ride confirmation - RENAMED
-  const handleRequestQuotes = () => {
-    PhantomWalletService()
+  const handleRequestQuotes = async () => {
+    const currentFare = rideState.fare?.baseFare;
+    if (!currentFare) {
+      console.error("No fare amount available");
+      return;
+    }
+    const fareInSOL = await convertINRtoSOL(currentFare);
+
+    setRideState(prev => ({
+      ...prev,
+      fare: {
+        ...prev.fare,
+        baseFare: currentFare,
+        totalFare: currentFare,
+        currency: "INR",
+        solAmount: fareInSOL,
+      },
+      status: "PROCESSING_PAYMENT",
+    }));
+
+    console.log("Fare in INR:", currentFare);
+    console.log("Fare in SOL:", fareInSOL);
+
     // console.log('phantom called')
     // if (!isSocketConnected) {
     //   Alert.alert(
@@ -225,7 +257,7 @@ const BookRide: React.FC<BookRideProps> = ({route}) => {
     //     ...prev,
     //     status: "error",
     //     errorMessage: "Connection failed",
-    //   }));
+    //   }));hghgh
     //   return;
     // }
 
@@ -281,13 +313,6 @@ const BookRide: React.FC<BookRideProps> = ({route}) => {
     //   }));
     //   return;
     // }
-
-    // setRideState(prev => ({
-    //   ...prev,
-    //   status: "QUOTATION_REQUEST_INITIATED", // Set pre-socket call status
-    //   quotationRequestId: undefined, // Will be set by socket event ack
-    //   errorMessage: undefined, // Clear previous errors
-    // }));
 
     // submitQuotationRequest(quotationDataForServer);
   };
@@ -474,22 +499,27 @@ const BookRide: React.FC<BookRideProps> = ({route}) => {
 
   // Function to get the price for the selected ride type
   const getSelectedRidePrice = (): string => {
-    if (!rideState.selectedRideType || !rideState.pickupLocation || !rideState.dropOffLocation) {
+    if (
+      !rideState.selectedRideType ||
+      !rideState.pickupLocation ||
+      !rideState.dropOffLocation
+    ) {
       return "₹ 0";
     }
 
-    const rideType = rideState.selectedRideType.includes("Taxi") ? "TAXI" : "MOTO";
+    const rideType = rideState.selectedRideType.includes("Taxi")
+      ? "TAXI"
+      : "MOTO";
     const price = calculatePriceByDistance(
       Number(rideState.pickupLocation.latitude),
       Number(rideState.pickupLocation.longitude),
       Number(rideState.dropOffLocation.latitude),
       Number(rideState.dropOffLocation.longitude),
-      rideType
+      rideType,
     );
 
     return `₹ ${price.toFixed(0)}`;
   };
-  
 
   return (
     <ScrollView
@@ -616,7 +646,11 @@ const BookRide: React.FC<BookRideProps> = ({route}) => {
                   <CustomButton
                     // title="Continue Booking Your GO Ride"
                     // status="primary"
-                    title={rideState.selectedRideType ? "Continue Booking" : "Select a Ride Type"}
+                    title={
+                      rideState.selectedRideType
+                        ? "Continue Booking"
+                        : "Select a Ride Type"
+                    }
                     status={rideState.selectedRideType ? "primary" : "disabled"}
                     size="medium"
                     onPress={() => {
@@ -638,40 +672,18 @@ const BookRide: React.FC<BookRideProps> = ({route}) => {
                   </TouchableOpacity>
                   <View style={styles.priceContainer}>
                     <Text style={styles.priceLabel}>Estimated Price:</Text>
-                    <Text style={styles.priceValue}>{getSelectedRidePrice()}</Text>
+                    <Text style={styles.priceValue}>
+                      {getSelectedRidePrice()}
+                    </Text>
                   </View>
                   <RadioGroup
                     selectedIndex={paymentMethod !== null ? paymentMethod : -1}
                     onChange={handlePaymentMethodChange}>
-                    <Radio style={styles.option}>
+                    {/* <Radio style={styles.option}>
                       {_evaProps => (
                         <>
                           <Text style={styles.h3}>Phantom Wallet</Text>
                           <PhantomIcon width={25} height={25} />
-                        </>
-                      )}
-                    </Radio>
-                    {/* <Radio style={styles.option}>
-                      {_evaProps => (
-                        <>
-                          <Text style={styles.h3}>Credit Card</Text>
-                          <CardIcon width={25} height={25} />
-                        </>
-                      )}
-                    </Radio>
-                    <Radio style={styles.option}>
-                      {_evaProps => (
-                        <>
-                          <Text style={styles.h3}>Debit Card</Text>
-                          <CardIcon width={25} height={25} />
-                        </>
-                      )}
-                    </Radio>
-                    <Radio style={styles.option}>
-                      {_evaProps => (
-                        <>
-                          <Text style={styles.h3}>Cash</Text>
-                          <CashIcon width={25} height={25} />
                         </>
                       )}
                     </Radio> */}
@@ -679,10 +691,10 @@ const BookRide: React.FC<BookRideProps> = ({route}) => {
                   <View style={{marginTop: 15}}>
                     <CustomButton
                       title="Request Quotes"
-                      status={paymentMethod !== null ? "primary" : "disabled"}
+                      status="primary"
                       size="medium"
                       onPress={handleRequestQuotes}
-                      disabled={paymentMethod === null}
+                      disabled={false}
                     />
                   </View>
                   <Text style={styles.paymentNote}>
@@ -715,6 +727,18 @@ const BookRide: React.FC<BookRideProps> = ({route}) => {
           </Text>
         </View>
       )}
+      <AppModal
+        type="timer"
+        isOpen={rideState.status === "PROCESSING_PAYMENT"}
+        onClose={() => {
+          setRideState(prev => ({
+            ...prev,
+            status: "PAYMENT_PROCESSING_CANCELLED",
+            errorMessage: "Payment processing cancelled"
+          }));
+        }}
+        duration={300} 
+      />
     </ScrollView>
   );
 };
