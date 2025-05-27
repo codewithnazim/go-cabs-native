@@ -19,6 +19,8 @@ export interface RideState {
       serviceFee: number;
       taxes: number;
     };
+    currency: string;
+    solAmount?: number; // Amount in SOL
   };
   pickupLocation?: {
     latitude: string;
@@ -44,6 +46,8 @@ export interface RideState {
     | "BIDS_RECEIVED"
     | "searching"
     | "driverFound"
+    | "PROCESSING_PAYMENT"
+    | "PAYMENT_PROCESSING_CANCELLED"
     | "confirmed"
     | "started"
     | "completed"
