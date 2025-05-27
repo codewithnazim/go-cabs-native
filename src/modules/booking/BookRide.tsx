@@ -32,8 +32,8 @@ import {
 import {useSocket} from "../../hooks/useSocket";
 import {BookingStackParamList} from "../../types/navigation/navigation.types";
 import {Dimensions as RNDimensions} from "react-native";
-import {QuotationRequestPayload} from "../../types/ride/types/ride.types";
 import { calculatePriceByDistance } from "../../utils/ride/distance/calculateDistance";
+import { PhantomWalletService } from "../../services/payment/phantom/phantomWalletService";
 
 const {width: screenWidth, height: screenHeight} = RNDimensions.get("window");
 
@@ -214,80 +214,82 @@ const BookRide: React.FC<BookRideProps> = ({route}) => {
 
   // Function to handle ride confirmation - RENAMED
   const handleRequestQuotes = () => {
-    if (!isSocketConnected) {
-      Alert.alert(
-        "Connection Error",
-        "Not connected to the server. Please check your internet connection or try again later.",
-      );
-      setRideState(prev => ({
-        ...prev,
-        status: "error",
-        errorMessage: "Connection failed",
-      }));
-      return;
-    }
+    PhantomWalletService()
+    // console.log('phantom called')
+    // if (!isSocketConnected) {
+    //   Alert.alert(
+    //     "Connection Error",
+    //     "Not connected to the server. Please check your internet connection or try again later.",
+    //   );
+    //   setRideState(prev => ({
+    //     ...prev,
+    //     status: "error",
+    //     errorMessage: "Connection failed",
+    //   }));
+    //   return;
+    // }
 
-    if (
-      !rideState.pickupLocation?.address ||
-      !rideState.dropOffLocation?.address ||
-      !rideState.pickupLocation.latitude ||
-      !rideState.pickupLocation.longitude ||
-      !rideState.dropOffLocation.latitude ||
-      !rideState.dropOffLocation.longitude
-    ) {
-      Alert.alert(
-        "Missing Info",
-        "Pickup and drop-off locations are missing or incomplete. Please go back to Home.",
-        [{text: "OK", onPress: () => navigation.goBack()}],
-      );
-      setRideState(prev => ({
-        ...prev,
-        status: "error",
-        errorMessage: "Location data missing",
-      }));
-      return;
-    }
+    // if (
+    //   !rideState.pickupLocation?.address ||
+    //   !rideState.dropOffLocation?.address ||
+    //   !rideState.pickupLocation.latitude ||
+    //   !rideState.pickupLocation.longitude ||
+    //   !rideState.dropOffLocation.latitude ||
+    //   !rideState.dropOffLocation.longitude
+    // ) {
+    //   Alert.alert(
+    //     "Missing Info",
+    //     "Pickup and drop-off locations are missing or incomplete. Please go back to Home.",
+    //     [{text: "OK", onPress: () => navigation.goBack()}],
+    //   );
+    //   setRideState(prev => ({
+    //     ...prev,
+    //     status: "error",
+    //     errorMessage: "Location data missing",
+    //   }));
+    //   return;
+    // }
 
-    const riderId = "current-rider-id"; // FIXME: Replace with actual rider ID from auth/user state
+    // const riderId = "current-rider-id"; // FIXME: Replace with actual rider ID from auth/user state
 
-    const quotationDataForServer: QuotationRequestPayload = {
-      riderId: riderId,
-      pickupLocation: {
-        latitude: Number(rideState.pickupLocation.latitude),
-        longitude: Number(rideState.pickupLocation.longitude),
-        address: rideState.pickupLocation.address || "",
-      },
-      dropoffLocation: {
-        latitude: Number(rideState.dropOffLocation.latitude),
-        longitude: Number(rideState.dropOffLocation.longitude),
-        address: rideState.dropOffLocation.address || "",
-      },
-      requestedAt: new Date().toISOString(),
-    };
+    // const quotationDataForServer: QuotationRequestPayload = {
+    //   riderId: riderId,
+    //   pickupLocation: {
+    //     latitude: Number(rideState.pickupLocation.latitude),
+    //     longitude: Number(rideState.pickupLocation.longitude),
+    //     address: rideState.pickupLocation.address || "",
+    //   },
+    //   dropoffLocation: {
+    //     latitude: Number(rideState.dropOffLocation.latitude),
+    //     longitude: Number(rideState.dropOffLocation.longitude),
+    //     address: rideState.dropOffLocation.address || "",
+    //   },
+    //   requestedAt: new Date().toISOString(),
+    // };
 
-    // console.log(
-    //   "Attempting to submit quotation request with data:",
-    //   quotationDataForServer,
-    // ); // Removed for cleanup: logs sensitive data
+    // // console.log(
+    // //   "Attempting to submit quotation request with data:",
+    // //   quotationDataForServer,
+    // // ); // Removed for cleanup: logs sensitive data
 
-    if (!submitQuotationRequest) {
-      Alert.alert("Error", "submitQuotationRequest not available. Dev issue.");
-      setRideState(prev => ({
-        ...prev,
-        status: "error",
-        errorMessage: "Quotation submission system error",
-      }));
-      return;
-    }
+    // if (!submitQuotationRequest) {
+    //   Alert.alert("Error", "submitQuotationRequest not available. Dev issue.");
+    //   setRideState(prev => ({
+    //     ...prev,
+    //     status: "error",
+    //     errorMessage: "Quotation submission system error",
+    //   }));
+    //   return;
+    // }
 
-    setRideState(prev => ({
-      ...prev,
-      status: "QUOTATION_REQUEST_INITIATED", // Set pre-socket call status
-      quotationRequestId: undefined, // Will be set by socket event ack
-      errorMessage: undefined, // Clear previous errors
-    }));
+    // setRideState(prev => ({
+    //   ...prev,
+    //   status: "QUOTATION_REQUEST_INITIATED", // Set pre-socket call status
+    //   quotationRequestId: undefined, // Will be set by socket event ack
+    //   errorMessage: undefined, // Clear previous errors
+    // }));
 
-    submitQuotationRequest(quotationDataForServer);
+    // submitQuotationRequest(quotationDataForServer);
   };
 
   // Render a single driver item with animations
