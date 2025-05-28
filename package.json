@@ -9,7 +9,7 @@
     "start": "react-native start --reset-cache",
     "test": "jest",
     "clean": "npm cache clean --force",
-    "build:android": "cd android && ./gradlew clean && ./gradlew assembleRelease",
+    "build:android": "cd android && gradlew.bat clean && gradlew.bat assembleRelease",
     "build:android-debug": "cd android && ./gradlew clean && ./gradlew assembleDebug",
     "setLocal": "ENVFILE=.env.development",
     "setProduction": "ENVFILE=.env.production",

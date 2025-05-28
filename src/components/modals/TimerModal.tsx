@@ -5,6 +5,7 @@ import {
   StyleSheet,
   TouchableOpacity,
   Clipboard,
+  Image,
 } from "react-native";
 import {Icon} from "@ui-kitten/components";
 import {TimerModalProps} from "./modalConfig";
@@ -21,14 +22,17 @@ const TimerModal: React.FC<TimerModalProps> = ({
   const [timeLeft, setTimeLeft] = useState<number>(duration);
   const [copied, setCopied] = useState(false);
   const [rideState, _] = useRecoilState(rideAtom);
-  const fare = rideState.fare?.finalFare;
+  const fare = rideState.fare?.finalFare || 0;
 
   const getFare = () => {
     console.log("fare in timer modal", fare);
+    return fare;
   };
 
   useEffect(() => {
     if (!isOpen) return;
+    
+    getFare();
 
     const timer = setInterval(() => {
       setTimeLeft((prev: number) => {
@@ -65,25 +69,24 @@ const TimerModal: React.FC<TimerModalProps> = ({
 
   const handleCopyAddress = async () => {
     // replace this with test/vipasannas wallet address
-    const walletAddress = "0x1234...5678";
+    const walletAddress = "7DfyijuUTX5LNtdMiKePdHPgw1sGd16wJ7oY813rwxb1";
     await Clipboard.setString(walletAddress);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
 
-  return (
+  return timeLeft > 0 ? (
     <View style={styles.modalContent}>
       <TouchableOpacity style={styles.closeButton} onPress={onClose}>
         <Icon name="close-outline" width={24} height={24} fill="#fff" />
-        {getFare()}
       </TouchableOpacity>
-
       <Text style={styles.timer}>{formatTime(timeLeft)}</Text>
-
       <View style={styles.addressContainer}>
         <Text style={styles.addressLabel}>Wallet Address:</Text>
         <View style={styles.addressBox}>
-          <Text style={styles.addressText}>0x1234...5678</Text>
+          <Text style={styles.addressText}>
+            7DfyijuUTX5LNtdMiKePdHPgw1sGd16wJ7oY813rwxb1
+          </Text>
           <TouchableOpacity
             onPress={handleCopyAddress}
             style={styles.copyButton}>
@@ -93,11 +96,21 @@ const TimerModal: React.FC<TimerModalProps> = ({
           </TouchableOpacity>
         </View>
       </View>
-
       <Text style={styles.instruction}>
-        `Copy this address and send {fare} to this wallet address, and come back
-        after the transaction is complete`
+        Copy this address and send {fare} to this wallet address, and come back
+        after the transaction is complete
       </Text>
+    </View>
+  ) : (
+    <View style={styles.modalContent}>
+      <TouchableOpacity style={styles.closeButton} onPress={onClose}>
+        <Icon name="close-outline" width={24} height={24} fill="#fff" />
+      </TouchableOpacity>
+<Image
+        source={require("../../../assets/images/icons/error-payment.png")}
+        style={styles.errorPayment}
+      />
+      <Text style={styles.instruction}>You ran out of time!</Text>
     </View>
   );
 };
@@ -166,6 +179,13 @@ const styles = StyleSheet.create({
     textAlign: "center",
     marginTop: 20,
     lineHeight: 24,
+  },
+  errorPayment: {
+    width: 100,
+    height: 100,
+    resizeMode: "contain",
+    borderRadius: 8,
+    backgroundColor: "#353f3b",
   },
 });
 
