@@ -47,3 +47,11 @@ export interface Bid {
   // Potentially driver's current location if needed for ETA calculation on frontend
   driverLocation?: {latitude: number; longitude: number};
 }
+
+export interface InitializeRideType {
+  riderId: string;
+  driverId: string;
+  amount: number;
+  driverPubKey: string;
+  riderPubKey: string;
+}

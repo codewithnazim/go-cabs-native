@@ -34,8 +34,9 @@ import {calculatePriceByDistance} from "../../utils/ride/distance/calculateDista
 // import {PhantomWalletService} from "../../services/payment/phantom/phantomWalletService";
 import {convertINRtoSOL} from "../../utils/currency/currencyConverter";
 import AppModal from "../../components/modals/AppModal";
-import { storage } from "../../store/mmkv/storage";
-import { STORAGE_KEYS } from "../../store/constants/storageKeys";
+import {storage} from "../../store/mmkv/storage";
+import {STORAGE_KEYS} from "../../store/constants/storageKeys";
+import { InitializeRideType } from "src/types/ride/types/ride.types";
 
 const {width: screenWidth, height: screenHeight} = RNDimensions.get("window");
 
@@ -222,6 +223,30 @@ const BookRide: React.FC<BookRideProps> = ({route}) => {
         confirmed: true,
       },
     }));
+  };
+
+  const handlePaymentSuccessful = async (data: InitializeRideType) => {
+    try {
+      const response = await fetch(
+        "http://localhost:5001/api/rider/ride/initialise",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(data),
+        },
+      );
+
+      if (!response.ok) {
+        throw new Error(`Server error: ${response.status}`);
+      }
+
+      const result = await response.json();
+      console.log("Ride initialized:", result);
+    } catch (error) {
+      console.error("Error initializing ride:", error);
+    }
   };
 
   const handleRequestQuotes = async () => {
@@ -734,10 +759,10 @@ const BookRide: React.FC<BookRideProps> = ({route}) => {
           setRideState(prev => ({
             ...prev,
             status: "PAYMENT_PROCESSING_CANCELLED",
-            errorMessage: "Payment processing cancelled"
+            errorMessage: "Payment processing cancelled",
           }));
         }}
-        duration={300} 
+        duration={300}
       />
     </ScrollView>
   );
