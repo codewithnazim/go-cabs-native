@@ -1,6 +1,6 @@
 import {StyleSheet, View} from "react-native";
 import React, {useEffect, useRef} from "react";
-import {Text} from "@ui-kitten/components";
+import {Text, Spinner} from "@ui-kitten/components";
 import {useNavigation} from "@react-navigation/native";
 import GoLogo from "../../assets/images/logo.svg";
 import {userEmailSelector} from "../store/selectors/user/userSelectors";
@@ -9,12 +9,21 @@ import auth from "@react-native-firebase/auth";
 import {GoogleSignin} from "@react-native-google-signin/google-signin";
 import {RootNavigationProp} from "../types/navigation/navigation.types";
 
-const SplashScreen = () => {
+interface SplashScreenProps {
+  showLoader?: boolean;
+}
+
+const SplashScreen: React.FC<SplashScreenProps> = ({ 
+  showLoader = false 
+}) => {
   const navigation = useNavigation<RootNavigationProp>();
   const user = useRecoilValue(userEmailSelector);
   const hasCheckedAuth = useRef(false);
 
   useEffect(() => {
+    // Don't run auth logic if we're just showing loader
+    if (showLoader) return;
+    
     if (hasCheckedAuth.current) return;
 
     const checkAuthState = async () => {
@@ -43,12 +52,17 @@ const SplashScreen = () => {
 
     const timer = setTimeout(checkAuthState, 1000);
     return () => clearTimeout(timer);
-  }, [user, navigation]);
+  }, [user, navigation, showLoader]);
 
   return (
     <View style={styles.container}>
       <GoLogo width={220} height={114} />
       <Text style={styles.text}>let's go</Text>
+      {showLoader && (
+        <View style={styles.loaderContainer}>
+          <Spinner size="small" status="primary" />
+        </View>
+      )}
     </View>
   );
 };
@@ -63,5 +77,8 @@ const styles = StyleSheet.create({
     fontSize: 28,
     marginTop: 20,
     fontFamily: "Montserrat-Regular",
+  },
+  loaderContainer: {
+    marginTop: 30,
   },
 });
