@@ -51,8 +51,8 @@ export const NavigationDebugger = {
   clearPersistedNavigation: () => {
     if (__DEV__) {
       const { mmkvUtils } = require('../store/mmkv/storage');
-      mmkvUtils.setNavigationState(null);
-      console.log('✅ Persisted navigation state cleared - app will start fresh');
+      mmkvUtils.clearNavigationData();
+      console.log('✅ All navigation data cleared - app will start fresh');
     }
   },
 
@@ -61,7 +61,38 @@ export const NavigationDebugger = {
     if (__DEV__) {
       const { storage } = require('../store/mmkv/storage');
       storage.delete('navigationState');
+      storage.delete('backgroundTimestamp');
       console.log('✅ Force reset: All navigation data cleared from MMKV');
+    }
+  },
+
+  // Simulate app being backgrounded for testing
+  simulateBackground: (minutesAgo: number = 5) => {
+    if (__DEV__) {
+      const { storage } = require('../store/mmkv/storage');
+      const timestamp = Date.now() - (minutesAgo * 60 * 1000);
+      storage.set('backgroundTimestamp', timestamp.toString());
+      console.log(`✅ Simulated app backgrounded ${minutesAgo} minutes ago`);
+    }
+  },
+
+  // Check current background status
+  checkBackgroundStatus: () => {
+    if (__DEV__) {
+      const { mmkvUtils } = require('../store/mmkv/storage');
+      const backgroundTime = mmkvUtils.getBackgroundTimestamp();
+      
+      if (!backgroundTime) {
+        console.log('📱 No background timestamp - app was killed/closed');
+        return;
+      }
+
+      const now = Date.now();
+      const timeDiff = now - backgroundTime;
+      const minutes = Math.round(timeDiff / 60000);
+      
+      console.log(`📱 App was backgrounded ${minutes} minutes ago`);
+      console.log(`📱 Should restore navigation: ${mmkvUtils.shouldRestoreNavigation()}`);
     }
   },
 }; 
