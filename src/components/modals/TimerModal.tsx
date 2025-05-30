@@ -1,4 +1,4 @@
-import React, {useEffect, useState} from "react";
+import React, {useEffect, useState, useRef, useCallback} from "react";
 import {
   View,
   Text,
@@ -10,6 +10,7 @@ import {Icon} from "@ui-kitten/components";
 import {TimerModalProps} from "./modalConfig";
 import {rideAtom} from "../../store/atoms/ride/rideAtom";
 import {useRecoilState} from "recoil";
+import { timerStartTimeAtom, timerDurationAtom } from "../../store/atoms/navigation/navigationAtoms";
 
 const TimerModal: React.FC<TimerModalProps> = ({
   isOpen,
@@ -20,40 +21,96 @@ const TimerModal: React.FC<TimerModalProps> = ({
 }) => {
   const [timeLeft, setTimeLeft] = useState<number>(duration);
   const [copied, setCopied] = useState(false);
-  const [rideState, _] = useRecoilState(rideAtom);
+  const [rideState] = useRecoilState(rideAtom);
   const fare = rideState.fare?.finalFare;
 
-  const getFare = () => {
-    console.log("fare in timer modal", fare);
-  };
+  // Timer persistence atoms
+  const [timerStartTime, setTimerStartTime] = useRecoilState(timerStartTimeAtom);
+  const [timerDuration, setTimerDuration] = useRecoilState(timerDurationAtom);
 
+  const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const pollRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Calculate remaining time based on timestamp
+  const calculateRemainingTime = useCallback(() => {
+    if (!timerStartTime) return duration;
+    
+    const now = Date.now();
+    const elapsed = Math.floor((now - timerStartTime) / 1000);
+    const remaining = Math.max(0, timerDuration - elapsed);
+    
+    console.log(`Timer: ${elapsed}s elapsed, ${remaining}s remaining`);
+    return remaining;
+  }, [timerStartTime, timerDuration, duration]);
+
+  // Initialize timer when modal opens
   useEffect(() => {
-    if (!isOpen) return;
+    if (!isOpen) {
+      // Clear timer state when modal closes
+      if (timerRef.current) clearInterval(timerRef.current);
+      if (pollRef.current) clearInterval(pollRef.current);
+      setTimerStartTime(null);
+      setTimerDuration(300);
+      return;
+    }
 
-    const timer = setInterval(() => {
-      setTimeLeft((prev: number) => {
-        if (prev <= 1) {
-          clearInterval(timer);
-          onComplete();
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
+    // Modal is opening - set up timer
+    setTimerDuration(duration);
 
-    const pollInterval = setInterval(async () => {
+    if (!timerStartTime) {
+      // First time opening - start new timer
+      const startTime = Date.now();
+      setTimerStartTime(startTime);
+      console.log('Timer started at:', new Date(startTime).toISOString());
+    }
+
+    // Calculate initial remaining time
+    const remaining = calculateRemainingTime();
+    setTimeLeft(remaining);
+
+    if (remaining <= 0) {
+      onComplete?.();
+      return;
+    }
+
+  }, [isOpen, duration, timerStartTime, timerDuration, calculateRemainingTime, onComplete, setTimerStartTime, setTimerDuration]);
+
+  // Timer countdown effect
+  useEffect(() => {
+    if (!isOpen || !timerStartTime) return;
+
+    const updateTimer = () => {
+      const remaining = calculateRemainingTime();
+      setTimeLeft(remaining);
+
+      if (remaining <= 0) {
+        if (timerRef.current) clearInterval(timerRef.current);
+        if (pollRef.current) clearInterval(pollRef.current);
+        onComplete?.();
+      }
+    };
+
+    // Update immediately
+    updateTimer();
+
+    // Set up interval for updates
+    timerRef.current = setInterval(updateTimer, 1000);
+
+    // Set up polling
+    pollRef.current = setInterval(async () => {
       const isComplete = await pollStatus();
       if (isComplete) {
-        clearInterval(pollInterval);
-        onComplete();
+        if (timerRef.current) clearInterval(timerRef.current);
+        if (pollRef.current) clearInterval(pollRef.current);
+        onComplete?.();
       }
     }, 5000);
 
     return () => {
-      clearInterval(timer);
-      clearInterval(pollInterval);
+      if (timerRef.current) clearInterval(timerRef.current);
+      if (pollRef.current) clearInterval(pollRef.current);
     };
-  }, [isOpen, onComplete, pollStatus, duration]);
+  }, [isOpen, timerStartTime, onComplete, pollStatus, calculateRemainingTime]);
 
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
@@ -71,11 +128,17 @@ const TimerModal: React.FC<TimerModalProps> = ({
     setTimeout(() => setCopied(false), 2000);
   };
 
+  const handleClose = () => {
+    // Clear timer state when closing
+    setTimerStartTime(null);
+    setTimerDuration(300);
+    onClose?.();
+  };
+
   return (
     <View style={styles.modalContent}>
-      <TouchableOpacity style={styles.closeButton} onPress={onClose}>
+      <TouchableOpacity style={styles.closeButton} onPress={handleClose}>
         <Icon name="close-outline" width={24} height={24} fill="#fff" />
-        {getFare()}
       </TouchableOpacity>
 
       <Text style={styles.timer}>{formatTime(timeLeft)}</Text>
@@ -95,8 +158,8 @@ const TimerModal: React.FC<TimerModalProps> = ({
       </View>
 
       <Text style={styles.instruction}>
-        `Copy this address and send {fare} to this wallet address, and come back
-        after the transaction is complete`
+        Copy this address and send {fare} to this wallet address, and come back
+        after the transaction is complete
       </Text>
     </View>
   );
