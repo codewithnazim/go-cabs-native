@@ -1,11 +1,8 @@
 import React from 'react';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { NavigationContainer, DefaultTheme } from '@react-navigation/native';
-import { useRecoilValue } from 'recoil';
 import { backgroundPrimary } from '../theme/colors';
-import { navigationLoadingAtom } from '../store/atoms/navigation/navigationAtoms';
 import { useNavigationPersistence } from '../hooks/useNavigationPersistence';
-import SplashScreen from '../components/SplashScreen';
 import AuthRoutes from './Auth.Routes';
 import OnbordingRoutes from './Onboarding.Routes';
 import UserRoutes from './User.Routes';
@@ -23,13 +20,7 @@ const MyTheme = {
 };
 
 const RootNavigator = () => {
-    const isLoading = useRecoilValue(navigationLoadingAtom);
     const { navigationState, handleNavigationStateChange } = useNavigationPersistence();
-
-    // Show splash screen with loader while navigation state is being restored
-    if (isLoading) {
-        return <SplashScreen isRestoringNavigation={true} />;
-    }
 
     return (
         <NavigationContainer 
