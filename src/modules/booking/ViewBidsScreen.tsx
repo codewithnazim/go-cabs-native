@@ -1,4 +1,4 @@
-import React, {useEffect, useState} from "react";
+import React, { useEffect, useState } from "react";
 import {
   View,
   Text,
@@ -7,21 +7,23 @@ import {
   TouchableOpacity,
   Alert,
 } from "react-native";
-import {useNavigation, RouteProp} from "@react-navigation/native";
-import {NativeStackNavigationProp} from "@react-navigation/native-stack";
-import {useRecoilValue} from "recoil"; // If needed for some global state not in socket
-import {useSocket} from "../../hooks/useSocket";
-import {rideAtom} from "../../store/atoms/ride/rideAtom"; // For local Recoil state if used beyond socket
-import {Bid} from "../../types/ride/types/ride.types"; // Import Bid type
-import {BookingStackParamList} from "../../types/navigation/navigation.types";
+import { useNavigation, RouteProp } from "@react-navigation/native";
+import { NativeStackNavigationProp } from "@react-navigation/native-stack";
+import { useRecoilState } from "recoil"; // If needed for some global state not in socket
+import { useSocket } from "../../hooks/useSocket";
+import { rideAtom } from "../../store/atoms/ride/rideAtom"; // For local Recoil state if used beyond socket
+import { Bid } from "../../types/ride/types/ride.types"; // Import Bid type
+import { BookingStackParamList } from "../../types/navigation/navigation.types";
 import CustomButton from "../../components/CustomButton";
 import Margin from "../../components/Margin";
 import {
   primaryColor,
   backgroundPrimary,
-  successColor,
   errorColor,
 } from "../../theme/colors";
+import AppModal from "../../components/modals/AppModal";
+import { saveTxnInFirestore, TxnStatus } from "../../components/modals/savePaymentDetails";
+import { convertINRtoSOL } from "../../utils/currency/currencyConverter";
 
 // Define local color constants
 const localTextPrimaryColor = "#EAEAEA";
@@ -43,12 +45,14 @@ interface ViewBidsScreenProps {
   route: ViewBidsScreenRouteProp;
 }
 
-const ViewBidsScreen: React.FC<ViewBidsScreenProps> = ({route}) => {
+const ViewBidsScreen: React.FC<ViewBidsScreenProps> = ({ route }) => {
   const navigation = useNavigation<ViewBidsNavigationProp>();
-  const {quotationId} = route.params;
+  const { quotationId } = route.params;
 
-  const {currentRideState, selectDriver, isConnected} = useSocket();
+  const { currentRideState, selectDriver, isConnected } = useSocket();
   const [bids, setBids] = useState<Bid[]>([]);
+
+  const [rideState, setRideState] = useRecoilState(rideAtom)
 
   useEffect(() => {
     if (
@@ -69,7 +73,7 @@ const ViewBidsScreen: React.FC<ViewBidsScreenProps> = ({route}) => {
             driverRating: socketBid.driverInfo?.rating || 0,
             vehicleDetails: socketBid.driverInfo?.vehicle || "N/A",
             bidAmount: socketBid.bidDetails?.amount || 0,
-            currency: socketBid.bidDetails?.currency || "USD",
+            currency: socketBid.bidDetails?.currency || "INR",
             estimatedArrivalTime: socketBid.bidDetails?.eta || "N/A",
             bidAt: socketBid.bidDetails?.timestamp || new Date().toISOString(),
             status: "PENDING_RIDER_APPROVAL",
@@ -84,7 +88,7 @@ const ViewBidsScreen: React.FC<ViewBidsScreenProps> = ({route}) => {
   }, [currentRideState, quotationId]);
 
   useEffect(() => {
-    if (currentRideState?.rideId === quotationId) {
+    if (currentRideState?.rideId === quotationId && rideState.status !== "PROCESSING_PAYMENT") {
       if (
         currentRideState.status === "confirmed_in_progress" &&
         currentRideState.selectedDriverInfo &&
@@ -106,13 +110,13 @@ const ViewBidsScreen: React.FC<ViewBidsScreenProps> = ({route}) => {
           rideDetails: currentRideState.requestDetails,
           acceptedAmount: currentRideState.acceptedBidDetails.amount || 0,
           acceptedCurrency:
-            currentRideState.acceptedBidDetails.currency || "USD",
+            currentRideState.acceptedBidDetails.currency || "INR",
         });
       } else if (currentRideState.status === "error") {
         Alert.alert(
           "Error",
           currentRideState.errorMessage ||
-            "An error occurred with your request.",
+          "An error occurred with your request.",
         );
         if (navigation.canGoBack()) navigation.goBack();
       } else if (currentRideState.status === "cancelled") {
@@ -143,22 +147,41 @@ const ViewBidsScreen: React.FC<ViewBidsScreenProps> = ({route}) => {
       "Confirm Bid",
       `Are you sure you want to accept the bid from ${bid.driverName} for ${bid.bidAmount}?`,
       [
-        {text: "Cancel", style: "cancel"},
+        { text: "Cancel", style: "cancel" },
         {
           text: "Accept",
-          onPress: () => {
-            console.log(
-              `Accepting bid from driver: ${bid.driverId}, socketId: ${bid.id}`,
-            );
-            selectDriver(bid.id); // bid.id is the driverSocketId
-            // UI should update based on currentRideState.status change to 'confirmed_in_progress'
+          onPress: async () => {
+            try {
+              console.log(
+                `Accepting bid from driver: ${bid.driverId}, socketId: ${bid.id}`,
+              );
+              await saveTxnInFirestore({
+                userId: "userId", // this will come from auth db or mmkv storage
+                inrAmount: bid.bidAmount,
+                solAmount: await convertINRtoSOL(bid.bidAmount),
+                status: TxnStatus.PENDING,
+                startTime: Date.now(),
+              })
+              setRideState({
+                status: "PROCESSING_PAYMENT",
+                fare: {
+                  ...rideState.fare!,
+                  finalFare: bid.bidAmount
+                }
+              })
+              selectDriver(bid.id); // bid.id is the driverSocketId
+              // UI should update based on currentRideState.status change to 'confirmed_in_progress'
+            } catch (error) {
+              console.error("Error accepting bid:", error);
+              Alert.alert("Error", "Failed to accept bid. Please try again.");
+            }
           },
         },
       ],
     );
   };
 
-  const renderBidItem = ({item}: {item: Bid}) => (
+  const renderBidItem = ({ item }: { item: Bid }) => (
     <TouchableOpacity
       style={styles.bidItem}
       onPress={() => handleAcceptBid(item)}>
@@ -197,7 +220,7 @@ const ViewBidsScreen: React.FC<ViewBidsScreenProps> = ({route}) => {
   }
 
   // If status is something other than pending_bids (and not a loading/transition state handled above or by navigation effect)
-  if (currentRideState.status !== "pending_bids") {
+  if (currentRideState.status !== "pending_bids" && rideState.status !== "PROCESSING_PAYMENT") {
     return (
       <View style={styles.containerCentered}>
         <Text style={styles.infoText}>
@@ -246,6 +269,18 @@ const ViewBidsScreen: React.FC<ViewBidsScreenProps> = ({route}) => {
           );
         }}
         status="danger"
+      />
+      <AppModal
+        type="timer"
+        isOpen={rideState.status === "PROCESSING_PAYMENT"}
+        onClose={() => {
+          setRideState(prev => ({
+            ...prev,
+            status: "PAYMENT_PROCESSING_CANCELLED",
+            errorMessage: "Payment processing cancelled"
+          }));
+        }}
+        duration={300}
       />
     </View>
   );
