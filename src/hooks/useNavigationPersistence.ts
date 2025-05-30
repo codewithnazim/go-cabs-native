@@ -4,7 +4,6 @@ import { NavigationState } from '@react-navigation/native';
 import { AppState, AppStateStatus } from 'react-native';
 import { 
   navigationStateAtom, 
-  navigationLoadingAtom, 
   isFirstLaunchAtom 
 } from '../store/atoms/navigation/navigationAtoms';
 import { mmkvUtils } from '../store/mmkv/storage';
@@ -12,7 +11,6 @@ import { NavigationDebugger } from '../utils/navigationDebugger';
 
 export const useNavigationPersistence = () => {
   const [navigationState, setNavigationState] = useRecoilState(navigationStateAtom);
-  const setNavigationLoading = useSetRecoilState(navigationLoadingAtom);
   const setIsFirstLaunch = useSetRecoilState(isFirstLaunchAtom);
   
   // Prevent multiple initializations
@@ -33,20 +31,26 @@ export const useNavigationPersistence = () => {
     }
   }, [setNavigationState]);
 
-  // Save state when app goes to background
+  // Handle app state changes with smart background logic
   const handleAppStateChange = useCallback((nextAppState: AppStateStatus) => {
-    if (nextAppState === 'background' && navigationState && !isRestoring.current) {
-      console.log('App going to background - saving navigation state');
-      NavigationDebugger.logNavigationState(navigationState, 'Saving to Background');
-      mmkvUtils.setNavigationState(navigationState);
+    if (nextAppState === 'background') {
+      console.log('App going to background - saving timestamp');
+      mmkvUtils.setBackgroundTimestamp();
+      
+      // Also save current navigation state
+      if (navigationState && !isRestoring.current) {
+        NavigationDebugger.logNavigationState(navigationState, 'Saving to Background');
+        mmkvUtils.setNavigationState(navigationState);
+      }
     } else if (nextAppState === 'active') {
       console.log('App came to foreground');
+      // Background timestamp and navigation restoration logic handled in initialization
     }
   }, [navigationState]);
 
   useEffect(() => {
     // Initialize navigation state on app start (only once)
-    const initializeNavigation = async () => {
+    const initializeNavigation = () => {
       if (isInitialized.current || isRestoring.current) {
         return;
       }
@@ -56,22 +60,40 @@ export const useNavigationPersistence = () => {
       
       try {
         console.log('Initializing navigation state...');
-        const persistedState = mmkvUtils.getNavigationState();
         
-        if (persistedState && NavigationDebugger.validateNavigationState(persistedState)) {
-          NavigationDebugger.logNavigationState(persistedState, 'Restored Navigation State');
-          setNavigationState(persistedState);
-          setIsFirstLaunch(false);
+        // Check if we should restore navigation based on background time
+        const shouldRestore = mmkvUtils.shouldRestoreNavigation();
+        
+        if (shouldRestore) {
+          // App was just minimized recently - restore navigation
+          const persistedState = mmkvUtils.getNavigationState();
+          
+          if (persistedState && NavigationDebugger.validateNavigationState(persistedState)) {
+            NavigationDebugger.logNavigationState(persistedState, 'Restored Navigation State');
+            setNavigationState(persistedState);
+            setIsFirstLaunch(false);
+            // Clear the background timestamp since we've successfully restored
+            mmkvUtils.clearBackgroundTimestamp();
+          } else {
+            console.log('No valid navigation state found - starting fresh');
+            mmkvUtils.clearNavigationData();
+            setNavigationState(null);
+            setIsFirstLaunch(true);
+          }
         } else {
-          console.log('No valid persisted navigation state found - starting fresh');
+          // App was killed or too much time passed - fresh start
+          console.log('Starting fresh - clearing navigation data');
+          mmkvUtils.clearNavigationData();
+          setNavigationState(null);
           setIsFirstLaunch(true);
         }
       } catch (error) {
         console.error('Failed to restore navigation state:', error);
+        mmkvUtils.clearNavigationData();
+        setNavigationState(null);
         setIsFirstLaunch(true);
       } finally {
         isRestoring.current = false;
-        setNavigationLoading(false);
         console.log('Navigation initialization complete');
       }
     };
@@ -87,7 +109,7 @@ export const useNavigationPersistence = () => {
     return () => {
       subscription?.remove();
     };
-  }, [setNavigationState, setNavigationLoading, setIsFirstLaunch, handleAppStateChange]);
+  }, [setNavigationState, setIsFirstLaunch, handleAppStateChange]);
 
   return {
     navigationState,
