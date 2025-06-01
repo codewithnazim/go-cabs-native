@@ -33,9 +33,10 @@ import {Dimensions as RNDimensions} from "react-native";
 import {calculatePriceByDistance} from "../../utils/ride/distance/calculateDistance";
 // import {PhantomWalletService} from "../../services/payment/phantom/phantomWalletService";
 import {convertINRtoSOL} from "../../utils/currency/currencyConverter";
-import AppModal from "../../components/modals/AppModal";
-import { storage } from "../../store/mmkv/storage";
-import { STORAGE_KEYS } from "../../store/constants/storageKeys";
+import {storage} from "../../store/mmkv/storage";
+import {STORAGE_KEYS} from "../../store/constants/storageKeys";
+import {QuotationRequestPayload} from "../../types/ride/types/ride.types";
+import {clearPaymentCache} from "../../utils/cache/clearCache";
 
 const {width: screenWidth, height: screenHeight} = RNDimensions.get("window");
 
@@ -101,6 +102,11 @@ const BookRide: React.FC<BookRideProps> = ({route}) => {
       }
     >(),
   );
+
+  // Clear any cached modal/payment state on component mount
+  useEffect(() => {
+    clearPaymentCache();
+  }, []);
 
   // This useEffect will now control whether the main component logic proceeds
   useEffect(() => {
@@ -241,80 +247,74 @@ const BookRide: React.FC<BookRideProps> = ({route}) => {
         currency: "INR",
         solAmount: fareInSOL,
       },
-      status: "PROCESSING_PAYMENT",
+      status: "QUOTATION_REQUEST_INITIATED",
     }));
 
     console.log("Fare in INR:", currentFare);
     console.log("Fare in SOL:", fareInSOL);
 
-    // console.log('phantom called')
-    // if (!isSocketConnected) {
-    //   Alert.alert(
-    //     "Connection Error",
-    //     "Not connected to the server. Please check your internet connection or try again later.",
-    //   );
-    //   setRideState(prev => ({
-    //     ...prev,
-    //     status: "error",
-    //     errorMessage: "Connection failed",
-    //   }));hghgh
-    //   return;
-    // }
+    if (!isSocketConnected) {
+      Alert.alert(
+        "Connection Error",
+        "Not connected to the server. Please check your internet connection or try again later.",
+      );
+      setRideState(prev => ({
+        ...prev,
+        status: "error",
+        errorMessage: "Connection failed",
+      }));
+      return;
+    }
 
-    // if (
-    //   !rideState.pickupLocation?.address ||
-    //   !rideState.dropOffLocation?.address ||
-    //   !rideState.pickupLocation.latitude ||
-    //   !rideState.pickupLocation.longitude ||
-    //   !rideState.dropOffLocation.latitude ||
-    //   !rideState.dropOffLocation.longitude
-    // ) {
-    //   Alert.alert(
-    //     "Missing Info",
-    //     "Pickup and drop-off locations are missing or incomplete. Please go back to Home.",
-    //     [{text: "OK", onPress: () => navigation.goBack()}],
-    //   );
-    //   setRideState(prev => ({
-    //     ...prev,
-    //     status: "error",
-    //     errorMessage: "Location data missing",
-    //   }));
-    //   return;
-    // }
+    if (
+      !rideState.pickupLocation?.address ||
+      !rideState.dropOffLocation?.address ||
+      !rideState.pickupLocation.latitude ||
+      !rideState.pickupLocation.longitude ||
+      !rideState.dropOffLocation.latitude ||
+      !rideState.dropOffLocation.longitude
+    ) {
+      Alert.alert(
+        "Missing Info",
+        "Pickup and drop-off locations are missing or incomplete. Please go back to Home.",
+        [{text: "OK", onPress: () => navigation.goBack()}],
+      );
+      setRideState(prev => ({
+        ...prev,
+        status: "error",
+        errorMessage: "Location data missing",
+      }));
+      return;
+    }
 
-    // const riderId = "current-rider-id"; // FIXME: Replace with actual rider ID from auth/user state
+    const riderId = "current-rider-id"; // FIXME: Replace with actual rider ID from auth/user state
 
-    // const quotationDataForServer: QuotationRequestPayload = {
-    //   riderId: riderId,
-    //   pickupLocation: {
-    //     latitude: Number(rideState.pickupLocation.latitude),
-    //     longitude: Number(rideState.pickupLocation.longitude),
-    //     address: rideState.pickupLocation.address || "",
-    //   },
-    //   dropoffLocation: {
-    //     latitude: Number(rideState.dropOffLocation.latitude),
-    //     longitude: Number(rideState.dropOffLocation.longitude),
-    //     address: rideState.dropOffLocation.address || "",
-    //   },
-    //   requestedAt: new Date().toISOString(),
-    // };
+    const quotationDataForServer: QuotationRequestPayload = {
+      riderId: riderId,
+      pickupLocation: {
+        latitude: Number(rideState.pickupLocation.latitude),
+        longitude: Number(rideState.pickupLocation.longitude),
+        address: rideState.pickupLocation.address || "",
+      },
+      dropoffLocation: {
+        latitude: Number(rideState.dropOffLocation.latitude),
+        longitude: Number(rideState.dropOffLocation.longitude),
+        address: rideState.dropOffLocation.address || "",
+      },
+      requestedAt: new Date().toISOString(),
+    };
 
-    // // console.log(
-    // //   "Attempting to submit quotation request with data:",
-    // //   quotationDataForServer,
-    // // ); // Removed for cleanup: logs sensitive data
+    if (!submitQuotationRequest) {
+      Alert.alert("Error", "submitQuotationRequest not available. Dev issue.");
+      setRideState(prev => ({
+        ...prev,
+        status: "error",
+        errorMessage: "Quotation submission system error",
+      }));
+      return;
+    }
 
-    // if (!submitQuotationRequest) {
-    //   Alert.alert("Error", "submitQuotationRequest not available. Dev issue.");
-    //   setRideState(prev => ({
-    //     ...prev,
-    //     status: "error",
-    //     errorMessage: "Quotation submission system error",
-    //   }));
-    //   return;
-    // }
-
-    // submitQuotationRequest(quotationDataForServer);
+    submitQuotationRequest(quotationDataForServer);
   };
 
   // Render a single driver item with animations
@@ -698,7 +698,7 @@ const BookRide: React.FC<BookRideProps> = ({route}) => {
                     />
                   </View>
                   <Text style={styles.paymentNote}>
-                    Payment will be processed at the end of your ride
+                    Payment will be required after selecting a driver bid
                   </Text>
                 </View>
               </>
@@ -727,18 +727,6 @@ const BookRide: React.FC<BookRideProps> = ({route}) => {
           </Text>
         </View>
       )}
-      <AppModal
-        type="timer"
-        isOpen={rideState.status === "PROCESSING_PAYMENT"}
-        onClose={() => {
-          setRideState(prev => ({
-            ...prev,
-            status: "PAYMENT_PROCESSING_CANCELLED",
-            errorMessage: "Payment processing cancelled"
-          }));
-        }}
-        duration={300} 
-      />
     </ScrollView>
   );
 };

@@ -11,11 +11,14 @@ import {useNavigation, RouteProp} from "@react-navigation/native";
 import {NativeStackNavigationProp} from "@react-navigation/native-stack";
 import {useRecoilValue} from "recoil"; // If needed for some global state not in socket
 import {useSocket} from "../../hooks/useSocket";
+import {usePayment} from "../../hooks/usePayment";
 import {rideAtom} from "../../store/atoms/ride/rideAtom"; // For local Recoil state if used beyond socket
+import {userAtom} from "../../store/atoms/user/userAtom";
 import {Bid} from "../../types/ride/types/ride.types"; // Import Bid type
 import {BookingStackParamList} from "../../types/navigation/navigation.types";
 import CustomButton from "../../components/CustomButton";
 import Margin from "../../components/Margin";
+import PaymentModal from "../../components/modals/PaymentModal";
 import {
   primaryColor,
   backgroundPrimary,
@@ -48,7 +51,13 @@ const ViewBidsScreen: React.FC<ViewBidsScreenProps> = ({route}) => {
   const {quotationId} = route.params;
 
   const {currentRideState, selectDriver, isConnected} = useSocket();
+  const {createPaymentSession, currentSession, paymentState} = usePayment();
+  const user = useRecoilValue(userAtom);
+
   const [bids, setBids] = useState<Bid[]>([]);
+  const [selectedBid, setSelectedBid] = useState<Bid | null>(null);
+  const [paymentModalVisible, setPaymentModalVisible] = useState(false);
+  const [isProcessingPayment, setIsProcessingPayment] = useState(false);
 
   useEffect(() => {
     if (
@@ -88,26 +97,38 @@ const ViewBidsScreen: React.FC<ViewBidsScreenProps> = ({route}) => {
       if (
         currentRideState.status === "confirmed_in_progress" &&
         currentRideState.selectedDriverInfo &&
-        currentRideState.acceptedBidDetails
+        currentRideState.acceptedBidDetails &&
+        currentSession?.status === "completed"
       ) {
-        // const driverSocketId = currentRideState.selectedDriverInfo.id;
-        // const acceptedSocketBid = currentRideState.bids.get(driverSocketId);
-
-        // console.log("[ViewBidsScreen] currentRideState for TrackRideScreen:", JSON.stringify(currentRideState)); // Removed for cleanup
+        console.log("[ViewBidsScreen] Ride confirmed with payment completed");
 
         Alert.alert(
-          "Bid Accepted!",
-          `You will be riding with ${currentRideState.selectedDriverInfo.name}.`,
+          "Payment & Ride Confirmed!",
+          `Payment successful! You will be riding with ${currentRideState.selectedDriverInfo.name}.`,
+          [
+            {
+              text: "Track Ride",
+              onPress: () => {
+                if (
+                  currentRideState.acceptedBidDetails &&
+                  currentRideState.selectedDriverInfo
+                ) {
+                  navigation.replace("TrackRideScreen", {
+                    rideId: quotationId,
+                    active_ride_room_id:
+                      currentRideState.active_ride_room_id || "",
+                    selectedDriverInfo: currentRideState.selectedDriverInfo,
+                    rideDetails: currentRideState.requestDetails,
+                    acceptedAmount:
+                      currentRideState.acceptedBidDetails.amount || 0,
+                    acceptedCurrency:
+                      currentRideState.acceptedBidDetails.currency || "USD",
+                  });
+                }
+              },
+            },
+          ],
         );
-        navigation.replace("TrackRideScreen", {
-          rideId: quotationId,
-          active_ride_room_id: currentRideState.active_ride_room_id || "",
-          selectedDriverInfo: currentRideState.selectedDriverInfo,
-          rideDetails: currentRideState.requestDetails,
-          acceptedAmount: currentRideState.acceptedBidDetails.amount || 0,
-          acceptedCurrency:
-            currentRideState.acceptedBidDetails.currency || "USD",
-        });
       } else if (currentRideState.status === "error") {
         Alert.alert(
           "Error",
@@ -119,15 +140,30 @@ const ViewBidsScreen: React.FC<ViewBidsScreenProps> = ({route}) => {
         Alert.alert("Cancelled", "The ride request has been cancelled.");
         if (navigation.canGoBack()) navigation.goBack();
       }
-      // No specific navigation for 'pending_bids' here as the screen itself handles this state.
     }
-  }, [currentRideState, quotationId, navigation]);
+  }, [currentRideState, quotationId, navigation, currentSession]);
 
-  const handleAcceptBid = (bid: Bid) => {
+  const handlePaymentComplete = () => {
+    console.log(
+      "[ViewBidsScreen] Payment completed, proceeding with driver selection",
+    );
+    setPaymentModalVisible(false);
+    setIsProcessingPayment(false);
+
+    if (selectedBid && isConnected) {
+      console.log(
+        `Selecting driver after payment: ${selectedBid.driverId}, socketId: ${selectedBid.id}`,
+      );
+      selectDriver(selectedBid.id);
+    }
+  };
+
+  const handleAcceptBid = async (bid: Bid) => {
     if (!isConnected) {
       Alert.alert("Error", "Not connected to server.");
       return;
     }
+
     if (
       !currentRideState ||
       currentRideState.rideId !== quotationId ||
@@ -139,40 +175,111 @@ const ViewBidsScreen: React.FC<ViewBidsScreenProps> = ({route}) => {
       );
       return;
     }
+
     Alert.alert(
-      "Confirm Bid",
-      `Are you sure you want to accept the bid from ${bid.driverName} for ${bid.bidAmount}?`,
+      "Confirm Bid & Payment",
+      `Accept bid from ${bid.driverName} for ₹${bid.bidAmount}?\n\nYou will need to complete payment before the ride is confirmed.`,
       [
         {text: "Cancel", style: "cancel"},
         {
-          text: "Accept",
-          onPress: () => {
-            console.log(
-              `Accepting bid from driver: ${bid.driverId}, socketId: ${bid.id}`,
-            );
-            selectDriver(bid.id); // bid.id is the driverSocketId
-            // UI should update based on currentRideState.status change to 'confirmed_in_progress'
+          text: "Accept & Pay",
+          onPress: async () => {
+            try {
+              setSelectedBid(bid);
+              setIsProcessingPayment(true);
+
+              // Create payment session
+              const paymentRequest = {
+                userId: user?.uid || "guest-user",
+                amount: bid.bidAmount,
+                rideId: quotationId,
+                bidId: bid.id,
+              };
+
+              console.log(
+                "[ViewBidsScreen] Creating payment session for bid:",
+                paymentRequest,
+              );
+
+              const session = await createPaymentSession(
+                paymentRequest,
+                handlePaymentComplete,
+              );
+
+              if (session) {
+                setPaymentModalVisible(true);
+                console.log(
+                  "[ViewBidsScreen] Payment session created, showing modal",
+                );
+              } else {
+                setIsProcessingPayment(false);
+                setSelectedBid(null);
+              }
+            } catch (error) {
+              console.error(
+                "[ViewBidsScreen] Error creating payment session:",
+                error,
+              );
+              setIsProcessingPayment(false);
+              setSelectedBid(null);
+              Alert.alert(
+                "Payment Error",
+                "Failed to initiate payment. Please try again.",
+              );
+            }
           },
         },
       ],
     );
   };
 
+  const handlePaymentModalClose = () => {
+    if (!currentSession || currentSession.status === "completed") {
+      setPaymentModalVisible(false);
+      setIsProcessingPayment(false);
+      setSelectedBid(null);
+    } else {
+      // Payment session is still active, confirm cancellation
+      Alert.alert(
+        "Cancel Payment",
+        "Are you sure you want to cancel the payment? The bid will not be accepted.",
+        [
+          {text: "Continue Payment", style: "cancel"},
+          {
+            text: "Cancel",
+            style: "destructive",
+            onPress: () => {
+              setPaymentModalVisible(false);
+              setIsProcessingPayment(false);
+              setSelectedBid(null);
+            },
+          },
+        ],
+      );
+    }
+  };
+
   const renderBidItem = ({item}: {item: Bid}) => (
     <TouchableOpacity
       style={styles.bidItem}
-      onPress={() => handleAcceptBid(item)}>
+      onPress={() => handleAcceptBid(item)}
+      disabled={isProcessingPayment}>
       <Text style={styles.driverName}>
         {item.driverName} (Rating:{" "}
         {item.driverRating ? item.driverRating.toFixed(1) : "N/A"}★)
       </Text>
       <Text style={styles.vehicleDetails}>Vehicle: {item.vehicleDetails}</Text>
       <Text style={styles.bidAmount}>
-        Bid: {item.bidAmount} {item.currency} (ETA: {item.estimatedArrivalTime})
+        Bid: ₹{item.bidAmount} (ETA: {item.estimatedArrivalTime})
       </Text>
       <Text style={styles.timestampText}>
         Bid Placed: {new Date(item.bidAt).toLocaleTimeString()}
       </Text>
+      {selectedBid?.id === item.id && isProcessingPayment && (
+        <View style={styles.processingIndicator}>
+          <Text style={styles.processingText}>Processing payment...</Text>
+        </View>
+      )}
     </TouchableOpacity>
   );
 
@@ -222,6 +329,10 @@ const ViewBidsScreen: React.FC<ViewBidsScreenProps> = ({route}) => {
       <Text style={styles.header}>
         Available Bids for Quotation ID: {quotationId}
       </Text>
+      <Text style={styles.subHeader}>
+        Select a bid to proceed with payment and ride confirmation
+      </Text>
+
       {bids.length === 0 ? (
         <Text style={styles.infoText}>
           No bids received yet. Waiting for drivers...
@@ -232,20 +343,36 @@ const ViewBidsScreen: React.FC<ViewBidsScreenProps> = ({route}) => {
           renderItem={renderBidItem}
           keyExtractor={item => item.id}
           style={styles.list}
+          extraData={isProcessingPayment}
         />
       )}
+
       <Margin margin={10} />
       <CustomButton
         title="Cancel Quotation"
         onPress={() => {
-          // TODO: Implement cancel quotation request logic via socketClient
-          // e.g., socketClient.cancelQuotationRequest(quotationId);
           Alert.alert(
             "Cancel Quotation",
-            "Cancel functionality requires server implementation.",
+            "Are you sure you want to cancel this quotation request?",
+            [
+              {text: "No", style: "cancel"},
+              {
+                text: "Yes, Cancel",
+                style: "destructive",
+                onPress: () => navigation.goBack(),
+              },
+            ],
           );
         }}
         status="danger"
+        disabled={isProcessingPayment}
+      />
+
+      {/* Payment Modal */}
+      <PaymentModal
+        visible={paymentModalVisible}
+        onClose={handlePaymentModalClose}
+        onPaymentComplete={handlePaymentComplete}
       />
     </View>
   );
@@ -267,7 +394,13 @@ const styles = StyleSheet.create({
   header: {
     fontSize: 20,
     fontWeight: "bold",
-    color: localTextPrimaryColor, // Use local constant
+    color: localTextPrimaryColor,
+    marginBottom: 8,
+    textAlign: "center",
+  },
+  subHeader: {
+    fontSize: 14,
+    color: localTextSecondaryColor,
     marginBottom: 16,
     textAlign: "center",
   },
@@ -275,7 +408,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   bidItem: {
-    backgroundColor: "#2C3E50", // A slightly different dark shade for items
+    backgroundColor: "#2C3E50",
     padding: 16,
     marginBottom: 10,
     borderRadius: 8,
@@ -285,21 +418,38 @@ const styles = StyleSheet.create({
   driverName: {
     fontSize: 16,
     fontWeight: "bold",
-    color: localTextPrimaryColor, // Use local constant
+    color: localTextPrimaryColor,
   },
   vehicleDetails: {
     fontSize: 14,
-    color: localTextSecondaryColor, // Use local constant
+    color: localTextSecondaryColor,
     marginVertical: 4,
   },
   bidAmount: {
     fontSize: 15,
     fontWeight: "bold",
-    color: localAccentColor, // Use local constant
+    color: localAccentColor,
+  },
+  timestampText: {
+    fontSize: 12,
+    color: localTextSecondaryColor,
+    marginTop: 4,
+  },
+  processingIndicator: {
+    marginTop: 8,
+    padding: 8,
+    backgroundColor: "rgba(1, 205, 93, 0.1)",
+    borderRadius: 4,
+  },
+  processingText: {
+    fontSize: 12,
+    color: primaryColor,
+    textAlign: "center",
+    fontStyle: "italic",
   },
   infoText: {
     fontSize: 16,
-    color: localTextSecondaryColor, // Use local constant
+    color: localTextSecondaryColor,
     textAlign: "center",
     marginTop: 20,
   },
@@ -307,11 +457,6 @@ const styles = StyleSheet.create({
     color: errorColor,
     fontSize: 16,
     textAlign: "center",
-  },
-  timestampText: {
-    fontSize: 12,
-    color: localTextSecondaryColor,
-    marginTop: 4,
   },
 });
 
