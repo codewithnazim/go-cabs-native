@@ -7,7 +7,8 @@ import {QuotationRequestPayload} from "../../../types/ride/types/ride.types";
 
 // Define the server URL using an environment variable with a fallback
 const SOCKET_SERVER_URL =
-  process.env.EXPO_PUBLIC_SOCKET_SERVER_URL || "http://10.0.2.2:4000";
+  process.env.EXPO_PUBLIC_SOCKET_SERVER_URL ||
+  "https://go-cabs-native.onrender.com";
 
 // Define a type for the ride progress state
 export interface Bid {
@@ -105,6 +106,7 @@ class SocketClient {
     );
     this.socket = io(this.serverUrl, {
       transports: ["websocket"], // Prioritize websocket
+      secure: true, // Ensure wss for https URLs
       autoConnect: false,
       reconnection: true,
       reconnectionAttempts: this.maxReconnectAttempts,
