@@ -1,4 +1,4 @@
-export type ModalType = "error" | "success" | "warn" | "timer" | "payment";
+export type ModalType = "error" | "success" | "warn" | "timer";
 
 export interface BaseModalProps {
   isOpen?: boolean;
@@ -11,10 +11,4 @@ export interface TimerModalProps extends BaseModalProps {
   pollStatus?: () => Promise<boolean>;
 }
 
-export interface PaymentModalProps extends BaseModalProps {
-  onPaymentComplete?: () => void;
-}
-
-export type AppModalProps =
-  | ({type: "timer"} & TimerModalProps)
-  | ({type: "payment"} & PaymentModalProps);
+export type AppModalProps = {type: "timer"} & TimerModalProps;

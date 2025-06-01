@@ -10,11 +10,7 @@ import {Icon} from "@ui-kitten/components";
 import {TimerModalProps} from "./modalConfig";
 import {rideAtom} from "../../store/atoms/ride/rideAtom";
 import {useRecoilState} from "recoil";
-import {
-  timerStartTimeAtom,
-  timerDurationAtom,
-} from "../../store/atoms/navigation/navigationAtoms";
-import {getPaymentWalletAddress} from "../../config/payment.config";
+import { timerStartTimeAtom, timerDurationAtom } from "../../store/atoms/navigation/navigationAtoms";
 
 const TimerModal: React.FC<TimerModalProps> = ({
   isOpen,
@@ -29,8 +25,7 @@ const TimerModal: React.FC<TimerModalProps> = ({
   const fare = rideState.fare?.finalFare;
 
   // Timer persistence atoms
-  const [timerStartTime, setTimerStartTime] =
-    useRecoilState(timerStartTimeAtom);
+  const [timerStartTime, setTimerStartTime] = useRecoilState(timerStartTimeAtom);
   const [timerDuration, setTimerDuration] = useRecoilState(timerDurationAtom);
 
   const timerRef = useRef<NodeJS.Timeout | null>(null);
@@ -39,11 +34,11 @@ const TimerModal: React.FC<TimerModalProps> = ({
   // Calculate remaining time based on timestamp
   const calculateRemainingTime = useCallback(() => {
     if (!timerStartTime) return duration;
-
+    
     const now = Date.now();
     const elapsed = Math.floor((now - timerStartTime) / 1000);
     const remaining = Math.max(0, timerDuration - elapsed);
-
+    
     console.log(`Timer: ${elapsed}s elapsed, ${remaining}s remaining`);
     return remaining;
   }, [timerStartTime, timerDuration, duration]);
@@ -66,7 +61,7 @@ const TimerModal: React.FC<TimerModalProps> = ({
       // First time opening - start new timer
       const startTime = Date.now();
       setTimerStartTime(startTime);
-      console.log("Timer started at:", new Date(startTime).toISOString());
+      console.log('Timer started at:', new Date(startTime).toISOString());
     }
 
     // Calculate initial remaining time
@@ -77,16 +72,8 @@ const TimerModal: React.FC<TimerModalProps> = ({
       onComplete?.();
       return;
     }
-  }, [
-    isOpen,
-    duration,
-    timerStartTime,
-    timerDuration,
-    calculateRemainingTime,
-    onComplete,
-    setTimerStartTime,
-    setTimerDuration,
-  ]);
+
+  }, [isOpen, duration, timerStartTime, timerDuration, calculateRemainingTime, onComplete, setTimerStartTime, setTimerDuration]);
 
   // Timer countdown effect
   useEffect(() => {
@@ -134,7 +121,8 @@ const TimerModal: React.FC<TimerModalProps> = ({
   };
 
   const handleCopyAddress = async () => {
-    const walletAddress = getPaymentWalletAddress();
+    // replace this with test/vipasannas wallet address
+    const walletAddress = "0x1234...5678";
     await Clipboard.setString(walletAddress);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
@@ -147,11 +135,6 @@ const TimerModal: React.FC<TimerModalProps> = ({
     onClose?.();
   };
 
-  const walletAddress = getPaymentWalletAddress();
-  const displayAddress = `${walletAddress.slice(0, 6)}...${walletAddress.slice(
-    -4,
-  )}`;
-
   return (
     <View style={styles.modalContent}>
       <TouchableOpacity style={styles.closeButton} onPress={handleClose}>
@@ -163,7 +146,7 @@ const TimerModal: React.FC<TimerModalProps> = ({
       <View style={styles.addressContainer}>
         <Text style={styles.addressLabel}>Wallet Address:</Text>
         <View style={styles.addressBox}>
-          <Text style={styles.addressText}>{displayAddress}</Text>
+          <Text style={styles.addressText}>0x1234...5678</Text>
           <TouchableOpacity
             onPress={handleCopyAddress}
             style={styles.copyButton}>
@@ -175,8 +158,8 @@ const TimerModal: React.FC<TimerModalProps> = ({
       </View>
 
       <Text style={styles.instruction}>
-        Copy this address and send {fare || "the required amount"} to this
-        wallet address, and come back after the transaction is complete
+        Copy this address and send {fare} to this wallet address, and come back
+        after the transaction is complete
       </Text>
     </View>
   );
