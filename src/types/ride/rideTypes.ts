@@ -1,6 +1,5 @@
 import {DriverBid} from "../driver/driverBidTypes";
 import {Driver} from "../driver/driverTypes";
-import {PaymentSession} from "../payment/paymentTypes";
 
 export interface RideState {
   email?: string;
@@ -34,10 +33,8 @@ export interface RideState {
     address?: string;
   };
   payment?: {
-    method: "metamask" | "credit" | "debit" | "cash" | "Phantom" | "solana";
+    method: "metamask" | "credit" | "debit" | "cash" | "Phantom";
     confirmed: boolean;
-    session?: PaymentSession;
-    transactionHash?: string;
   };
   status?:
     | "idle"
@@ -47,13 +44,10 @@ export interface RideState {
     | "QUOTATION_REQUEST_INITIATED"
     | "PENDING_BIDS"
     | "BIDS_RECEIVED"
-    | "PAYMENT_PENDING"
-    | "PAYMENT_PROCESSING"
-    | "PAYMENT_COMPLETED"
-    | "PAYMENT_FAILED"
-    | "PAYMENT_EXPIRED"
     | "searching"
     | "driverFound"
+    | "PROCESSING_PAYMENT"
+    | "PAYMENT_PROCESSING_CANCELLED"
     | "confirmed"
     | "started"
     | "completed"

@@ -15,9 +15,8 @@ import {
   NavigationProp,
 } from "@react-navigation/native";
 import {useSocket} from "../../hooks/useSocket";
-import {usePayment} from "../../hooks/usePayment";
 import {BookingStackParamList} from "../../types/navigation/navigation.types";
-import {primaryColor, errorColor, successColor} from "../../theme/colors";
+import {primaryColor, errorColor} from "../../theme/colors";
 import WebView from "react-native-webview";
 
 const screenHeight = Dimensions.get("window").height;
@@ -27,17 +26,16 @@ type TrackRideScreenRouteProp = RouteProp<
   "TrackRideScreen"
 >;
 
-type Location = {
+interface Location {
   latitude: number;
   longitude: number;
-  address: string;
-};
+  address?: string;
+}
 
 const TrackRideScreen = () => {
   const navigation = useNavigation<NavigationProp<BookingStackParamList>>();
   const route = useRoute<TrackRideScreenRouteProp>();
   const {currentRideState, driverLocation, isConnected} = useSocket();
-  const {currentSession} = usePayment();
   const webViewRef = React.useRef<WebView>(null);
   const [isMapReady, setIsMapReady] = useState(false);
 
@@ -55,6 +53,8 @@ const TrackRideScreen = () => {
       ]);
       return;
     }
+
+    // console.log("TrackRideScreen mounted with params:", route.params); // Removed for cleanup
 
     // Validate that we're tracking the correct ride
     if (
@@ -132,33 +132,6 @@ const TrackRideScreen = () => {
   const destinationAddress =
     (route.params.rideDetails?.dropoffLocation as Location)?.address || "N/A";
 
-  const getPaymentStatusDisplay = () => {
-    if (!currentSession) {
-      return {text: "Payment not required", color: successColor};
-    }
-
-    switch (currentSession.status) {
-      case "completed":
-        return {
-          text: `Payment Confirmed (${currentSession.transactionHash?.slice(
-            0,
-            8,
-          )}...)`,
-          color: successColor,
-        };
-      case "pending":
-        return {text: "Payment Pending", color: "#FFA500"};
-      case "expired":
-        return {text: "Payment Expired", color: errorColor};
-      case "failed":
-        return {text: "Payment Failed", color: errorColor};
-      default:
-        return {text: "Payment Status Unknown", color: "#888"};
-    }
-  };
-
-  const paymentStatus = getPaymentStatusDisplay();
-
   return (
     <View style={styles.screenContainer}>
       <View style={styles.mapViewContainer}>
@@ -170,17 +143,20 @@ const TrackRideScreen = () => {
           javaScriptEnabled={true}
           domStorageEnabled={true}
           onLoadEnd={() => {
+            // console.log("TrackRideScreen WebView content loaded (onLoadEnd)");
             // Don't inject here directly, wait for MAP_READY message
           }}
           onMessage={event => {
             const data = JSON.parse(event.nativeEvent.data);
             if (data.type === "MAP_READY") {
+              // console.log("[TrackRideScreen] WebView signaled MAP_READY");
               setIsMapReady(true);
               // Perform initial injection if data is available now that map is ready
               if (driverLocation && route.params.rideDetails?.dropoffLocation) {
                 const dest = route.params.rideDetails
                   .dropoffLocation as Location;
                 const script = `if(window.updateDriverTrackingView) window.updateDriverTrackingView(${driverLocation.lon}, ${driverLocation.lat}, ${dest.longitude}, ${dest.latitude}); else { console.warn(\'WebView: updateDriverTrackingView not ready for initial call.\'); } true;`;
+                // console.log("[TrackRideScreen] Injecting script for initial location update after MAP_READY:", script);
                 webViewRef.current?.injectJavaScript(script);
               }
             }
@@ -197,21 +173,6 @@ const TrackRideScreen = () => {
         <Text style={styles.title}>Tracking Your Ride</Text>
         <Text style={styles.subtitle}>Ride ID: {route.params.rideId}</Text>
 
-        {/* Payment Status Card */}
-        <View style={styles.paymentStatusContainer}>
-          <Text style={styles.sectionTitle}>Payment Status:</Text>
-          <Text
-            style={[styles.paymentStatusText, {color: paymentStatus.color}]}>
-            {paymentStatus.text}
-          </Text>
-          {currentSession && currentSession.status === "completed" && (
-            <Text style={styles.paymentDetailsText}>
-              Amount Paid: {currentSession.solAmount.toFixed(4)} SOL (₹
-              {currentSession.amount})
-            </Text>
-          )}
-        </View>
-
         <View style={styles.rideInfoContainer}>
           <Text style={styles.sectionTitle}>Ride Details:</Text>
           <Text style={styles.infoText}>
@@ -223,7 +184,7 @@ const TrackRideScreen = () => {
           <Text style={styles.infoText}>
             Fare:{" "}
             {typeof acceptedAmount === "number" && acceptedCurrency
-              ? `₹${acceptedAmount.toFixed(2)} ${acceptedCurrency}`
+              ? `${acceptedAmount.toFixed(2)} ${acceptedCurrency}`
               : "N/A"}
           </Text>
         </View>
@@ -244,17 +205,23 @@ const TrackRideScreen = () => {
           </Text>
         </View>
 
-        {driverLocation && (
-          <View style={styles.locationContainer}>
-            <Text style={styles.sectionTitle}>Driver Location:</Text>
-            <Text style={styles.infoText}>
-              Latitude: {driverLocation.lat.toFixed(6)}
-            </Text>
-            <Text style={styles.infoText}>
-              Longitude: {driverLocation.lon.toFixed(6)}
-            </Text>
-          </View>
-        )}
+        <View style={styles.locationContainer}>
+          <Text style={styles.sectionTitle}>Driver's Location:</Text>
+          {driverLocation ? (
+            <>
+              <Text style={styles.infoText}>
+                Latitude: {driverLocation.lat}
+              </Text>
+              <Text style={styles.infoText}>
+                Longitude: {driverLocation.lon}
+              </Text>
+            </>
+          ) : (
+            <Text style={styles.infoText}>Waiting for location updates...</Text>
+          )}
+        </View>
+
+        {error && <Text style={styles.errorText}>{error}</Text>}
       </ScrollView>
     </View>
   );
@@ -299,24 +266,6 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     textAlign: "center",
     color: "#666",
-  },
-  paymentStatusContainer: {
-    backgroundColor: "#f5f5f5",
-    padding: 16,
-    borderRadius: 8,
-    marginBottom: 16,
-    borderLeftWidth: 4,
-    borderLeftColor: primaryColor,
-  },
-  paymentStatusText: {
-    fontSize: 16,
-    fontWeight: "bold",
-    marginBottom: 4,
-  },
-  paymentDetailsText: {
-    fontSize: 12,
-    color: "#666",
-    fontStyle: "italic",
   },
   rideInfoContainer: {
     backgroundColor: "#f5f5f5",
