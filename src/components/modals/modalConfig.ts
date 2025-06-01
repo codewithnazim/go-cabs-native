@@ -3,6 +3,7 @@ export type ModalType = "error" | "success" | "warn" | "timer";
 export interface BaseModalProps {
   isOpen?: boolean;
   onClose?: () => void;
+  isLoading?: boolean
 }
 
 export interface TimerModalProps extends BaseModalProps {

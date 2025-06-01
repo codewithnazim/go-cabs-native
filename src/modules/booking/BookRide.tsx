@@ -8,36 +8,36 @@ import {
   Alert,
   Switch,
 } from "react-native";
-import React, {useState, useRef, useEffect} from "react";
+import React, { useState, useRef, useEffect } from "react";
 import WebView from "react-native-webview";
-import {backgroundPrimary, primaryColor} from "../../theme/colors";
-import {Radio, RadioGroup} from "@ui-kitten/components";
+import { backgroundPrimary, primaryColor } from "../../theme/colors";
+import { Radio, RadioGroup } from "@ui-kitten/components";
 import DullDivider from "../../components/DullDivider";
 import CarIcon from "../../../assets/images/icons/car.svg";
 import PhantomIcon from "../../../assets/images/icons/PhantomIcon.svg";
-import {fetchEvChargingStations} from "../../services/evCharging/evChargingService";
-import {EvChargingStationMarker} from "../../types/evCharging/evChargingTypes";
+import { fetchEvChargingStations } from "../../services/evCharging/evChargingService";
+import { EvChargingStationMarker } from "../../types/evCharging/evChargingTypes";
 import CustomButton from "../../components/CustomButton";
 import Margin from "../../components/Margin";
-import {useRecoilState} from "recoil";
-import {rideAtom} from "../../store/atoms/ride/rideAtom";
-import {Driver} from "../../types/driver/driverTypes";
+import { useRecoilState } from "recoil";
+import { rideAtom } from "../../store/atoms/ride/rideAtom";
+import { Driver } from "../../types/driver/driverTypes";
 import {
   useNavigation,
   NavigationProp,
   RouteProp,
 } from "@react-navigation/native";
-import {useSocket} from "../../hooks/useSocket";
-import {BookingStackParamList} from "../../types/navigation/navigation.types";
-import {Dimensions as RNDimensions} from "react-native";
-import {calculatePriceByDistance} from "../../utils/ride/distance/calculateDistance";
+import { useSocket } from "../../hooks/useSocket";
+import { BookingStackParamList } from "../../types/navigation/navigation.types";
+import { Dimensions as RNDimensions } from "react-native";
+import { calculatePriceByDistance } from "../../utils/ride/distance/calculateDistance";
 // import {PhantomWalletService} from "../../services/payment/phantom/phantomWalletService";
-import {convertINRtoSOL} from "../../utils/currency/currencyConverter";
-import AppModal from "../../components/modals/AppModal";
+import { convertINRtoSOL } from "../../utils/currency/currencyConverter";
 import { storage } from "../../store/mmkv/storage";
 import { STORAGE_KEYS } from "../../store/constants/storageKeys";
+import { QuotationRequestPayload } from "../../types/ride/types/ride.types";
 
-const {width: screenWidth, height: screenHeight} = RNDimensions.get("window");
+const { width: screenWidth, height: screenHeight } = RNDimensions.get("window");
 
 // // Define the expected structure for selected locations
 // interface SelectedLocation {
@@ -63,7 +63,7 @@ interface BookRideProps {
   // navigation is already available via useNavigation hook
 }
 
-const BookRide: React.FC<BookRideProps> = ({route}) => {
+const BookRide: React.FC<BookRideProps> = ({ route }) => {
   const navigation = useNavigation<NavigationProp<BookingStackParamList>>();
   const passedPickupLocation = route.params?.pickupLocation;
   const passedDropOffLocation = route.params?.dropOffLocation;
@@ -241,80 +241,80 @@ const BookRide: React.FC<BookRideProps> = ({route}) => {
         currency: "INR",
         solAmount: fareInSOL,
       },
-      status: "PROCESSING_PAYMENT",
+      status: "QUOTATION_REQUEST_INITIATED" // TODO:
     }));
 
     console.log("Fare in INR:", currentFare);
     console.log("Fare in SOL:", fareInSOL);
 
-    // console.log('phantom called')
-    // if (!isSocketConnected) {
-    //   Alert.alert(
-    //     "Connection Error",
-    //     "Not connected to the server. Please check your internet connection or try again later.",
-    //   );
-    //   setRideState(prev => ({
-    //     ...prev,
-    //     status: "error",
-    //     errorMessage: "Connection failed",
-    //   }));hghgh
-    //   return;
-    // }
+    console.log('phantom called')
+    if (!isSocketConnected) {
+      Alert.alert(
+        "Connection Error",
+        "Not connected to the server. Please check your internet connection or try again later.",
+      );
+      setRideState(prev => ({
+        ...prev,
+        status: "error",
+        errorMessage: "Connection failed",
+      }));
+      return;
+    }
 
-    // if (
-    //   !rideState.pickupLocation?.address ||
-    //   !rideState.dropOffLocation?.address ||
-    //   !rideState.pickupLocation.latitude ||
-    //   !rideState.pickupLocation.longitude ||
-    //   !rideState.dropOffLocation.latitude ||
-    //   !rideState.dropOffLocation.longitude
-    // ) {
-    //   Alert.alert(
-    //     "Missing Info",
-    //     "Pickup and drop-off locations are missing or incomplete. Please go back to Home.",
-    //     [{text: "OK", onPress: () => navigation.goBack()}],
-    //   );
-    //   setRideState(prev => ({
-    //     ...prev,
-    //     status: "error",
-    //     errorMessage: "Location data missing",
-    //   }));
-    //   return;
-    // }
+    if (
+      !rideState.pickupLocation?.address ||
+      !rideState.dropOffLocation?.address ||
+      !rideState.pickupLocation.latitude ||
+      !rideState.pickupLocation.longitude ||
+      !rideState.dropOffLocation.latitude ||
+      !rideState.dropOffLocation.longitude
+    ) {
+      Alert.alert(
+        "Missing Info",
+        "Pickup and drop-off locations are missing or incomplete. Please go back to Home.",
+        [{ text: "OK", onPress: () => navigation.goBack() }],
+      );
+      setRideState(prev => ({
+        ...prev,
+        status: "error",
+        errorMessage: "Location data missing",
+      }));
+      return;
+    }
 
-    // const riderId = "current-rider-id"; // FIXME: Replace with actual rider ID from auth/user state
+    const riderId = "current-rider-id"; // FIXME: Replace with actual rider ID from auth/user state
 
-    // const quotationDataForServer: QuotationRequestPayload = {
-    //   riderId: riderId,
-    //   pickupLocation: {
-    //     latitude: Number(rideState.pickupLocation.latitude),
-    //     longitude: Number(rideState.pickupLocation.longitude),
-    //     address: rideState.pickupLocation.address || "",
-    //   },
-    //   dropoffLocation: {
-    //     latitude: Number(rideState.dropOffLocation.latitude),
-    //     longitude: Number(rideState.dropOffLocation.longitude),
-    //     address: rideState.dropOffLocation.address || "",
-    //   },
-    //   requestedAt: new Date().toISOString(),
-    // };
+    const quotationDataForServer: QuotationRequestPayload = {
+      riderId: riderId,
+      pickupLocation: {
+        latitude: Number(rideState.pickupLocation.latitude),
+        longitude: Number(rideState.pickupLocation.longitude),
+        address: rideState.pickupLocation.address || "",
+      },
+      dropoffLocation: {
+        latitude: Number(rideState.dropOffLocation.latitude),
+        longitude: Number(rideState.dropOffLocation.longitude),
+        address: rideState.dropOffLocation.address || "",
+      },
+      requestedAt: new Date().toISOString(),
+    };
 
-    // // console.log(
-    // //   "Attempting to submit quotation request with data:",
-    // //   quotationDataForServer,
-    // // ); // Removed for cleanup: logs sensitive data
+    // console.log(
+    //   "Attempting to submit quotation request with data:",
+    //   quotationDataForServer,
+    // ); // Removed for cleanup: logs sensitive data
 
-    // if (!submitQuotationRequest) {
-    //   Alert.alert("Error", "submitQuotationRequest not available. Dev issue.");
-    //   setRideState(prev => ({
-    //     ...prev,
-    //     status: "error",
-    //     errorMessage: "Quotation submission system error",
-    //   }));
-    //   return;
-    // }
+    if (!submitQuotationRequest) {
+      Alert.alert("Error", "submitQuotationRequest not available. Dev issue.");
+      setRideState(prev => ({
+        ...prev,
+        status: "error",
+        errorMessage: "Quotation submission system error",
+      }));
+      return;
+    }
 
-    // submitQuotationRequest(quotationDataForServer);
+    submitQuotationRequest(quotationDataForServer);
   };
 
   // Render a single driver item with animations
@@ -323,7 +323,7 @@ const BookRide: React.FC<BookRideProps> = ({route}) => {
     const animationValues = animationsMap.current.get(driver.animationId);
     if (!animationValues) return null;
 
-    const {translateX, progress, opacity} = animationValues;
+    const { translateX, progress, opacity } = animationValues;
 
     return (
       <Animated.View
@@ -331,7 +331,7 @@ const BookRide: React.FC<BookRideProps> = ({route}) => {
         style={[
           styles.driverItem,
           {
-            transform: [{translateX}],
+            transform: [{ translateX }],
             opacity,
           },
         ]}>
@@ -550,7 +550,7 @@ const BookRide: React.FC<BookRideProps> = ({route}) => {
                     `);
                   }
                 }}
-                trackColor={{false: "#767577", true: "#81b0ff"}}
+                trackColor={{ false: "#767577", true: "#81b0ff" }}
                 thumbColor={showChargingStations ? primaryColor : "#f4f3f4"}
               />
             </View>
@@ -560,14 +560,14 @@ const BookRide: React.FC<BookRideProps> = ({route}) => {
             <WebView
               ref={webViewRef}
               originWhitelist={["*"]}
-              source={{uri: "file:///android_asset/map.html"}} // Make sure this path is correct for your setup
+              source={{ uri: "file:///android_asset/map.html" }} // Make sure this path is correct for your setup
               style={styles.map}
               onLoadEnd={() => {
                 // console.log("[BookRide] WebView loaded. Sending coordinates.");
                 sendDataToWebView();
               }}
               onError={syntheticEvent => {
-                const {nativeEvent} = syntheticEvent;
+                const { nativeEvent } = syntheticEvent;
                 console.warn("[BookRide] WebView error: ", nativeEvent);
               }}
               onMessage={event => {
@@ -593,7 +593,7 @@ const BookRide: React.FC<BookRideProps> = ({route}) => {
               javaScriptEnabled={true}
               domStorageEnabled={true}
               startInLoadingState={true}
-              // renderLoading={() => <ActivityIndicator size="large" color={primaryColor} />} // Optional loading indicator
+            // renderLoading={() => <ActivityIndicator size="large" color={primaryColor} />} // Optional loading indicator
             />
           </View>
 
@@ -604,45 +604,45 @@ const BookRide: React.FC<BookRideProps> = ({route}) => {
                 <View>
                   {!showDrivers
                     ? (compare ? ridesDataCompared : ridesData)?.map(
-                        (item, index) => (
-                          <TouchableOpacity
-                            key={index.toString()}
-                            style={[
-                              styles.listItem,
-                              rideState.selectedRideType === item.name &&
-                                styles.selectedRide,
-                            ]}
-                            onPress={() => {
-                              const priceString = item.price;
-                              const numericPrice = parseInt(
-                                priceString.replace("₹ ", ""),
-                                10,
+                      (item, index) => (
+                        <TouchableOpacity
+                          key={index.toString()}
+                          style={[
+                            styles.listItem,
+                            rideState.selectedRideType === item.name &&
+                            styles.selectedRide,
+                          ]}
+                          onPress={() => {
+                            const priceString = item.price;
+                            const numericPrice = parseInt(
+                              priceString.replace("₹ ", ""),
+                              10,
+                            );
+                            if (!isNaN(numericPrice)) {
+                              handleRideSelection(item.name, numericPrice);
+                            } else {
+                              console.error(
+                                "Could not parse price:",
+                                priceString,
                               );
-                              if (!isNaN(numericPrice)) {
-                                handleRideSelection(item.name, numericPrice);
-                              } else {
-                                console.error(
-                                  "Could not parse price:",
-                                  priceString,
-                                );
-                              }
-                            }}>
-                            <CarIcon width={50} height={50} />
-                            <View style={{flexGrow: 1}}>
-                              <Text style={styles.h1}>{item.name}</Text>
-                              <Text style={styles.h2}>{item.arrival}</Text>
-                            </View>
-                            <Text
-                              style={[styles.h1, {alignSelf: "flex-start"}]}>
-                              {item.price}
-                            </Text>
-                          </TouchableOpacity>
-                        ),
-                      )
+                            }
+                          }}>
+                          <CarIcon width={50} height={50} />
+                          <View style={{ flexGrow: 1 }}>
+                            <Text style={styles.h1}>{item.name}</Text>
+                            <Text style={styles.h2}>{item.arrival}</Text>
+                          </View>
+                          <Text
+                            style={[styles.h1, { alignSelf: "flex-start" }]}>
+                            {item.price}
+                          </Text>
+                        </TouchableOpacity>
+                      ),
+                    )
                     : animatedDrivers.map(driver => renderDriverItem(driver))}
                 </View>
                 <Margin margin={10} />
-                <View style={{paddingHorizontal: 20, marginTop: 5}}>
+                <View style={{ paddingHorizontal: 20, marginTop: 5 }}>
                   <CustomButton
                     // title="Continue Booking Your GO Ride"
                     // status="primary"
@@ -662,7 +662,7 @@ const BookRide: React.FC<BookRideProps> = ({route}) => {
               </>
             ) : (
               <>
-                <View style={{padding: 20}}>
+                <View style={{ padding: 20 }}>
                   <TouchableOpacity
                     style={styles.backButton}
                     onPress={() => setIsPayment(false)}>
@@ -688,7 +688,7 @@ const BookRide: React.FC<BookRideProps> = ({route}) => {
                       )}
                     </Radio> */}
                   </RadioGroup>
-                  <View style={{marginTop: 15}}>
+                  <View style={{ marginTop: 15 }}>
                     <CustomButton
                       title="Request Quotes"
                       status="primary"
@@ -718,27 +718,15 @@ const BookRide: React.FC<BookRideProps> = ({route}) => {
         rideState.status === "QUOTATION_REQUEST_INITIATED" ||
         socketRideState?.status === "creating_request" || // Retain for direct ride if ever used
         socketRideState?.status === "creating_quotation_request") && (
-        <View style={styles.loadingOverlay}>
-          <Text style={styles.loadingText}>
-            {rideState.status === "QUOTATION_REQUEST_INITIATED" ||
-            socketRideState?.status === "creating_quotation_request"
-              ? "Requesting quotes..."
-              : "Creating your ride request..."}
-          </Text>
-        </View>
-      )}
-      <AppModal
-        type="timer"
-        isOpen={rideState.status === "PROCESSING_PAYMENT"}
-        onClose={() => {
-          setRideState(prev => ({
-            ...prev,
-            status: "PAYMENT_PROCESSING_CANCELLED",
-            errorMessage: "Payment processing cancelled"
-          }));
-        }}
-        duration={300} 
-      />
+          <View style={styles.loadingOverlay}>
+            <Text style={styles.loadingText}>
+              {rideState.status === "QUOTATION_REQUEST_INITIATED" ||
+                socketRideState?.status === "creating_quotation_request"
+                ? "Requesting quotes..."
+                : "Creating your ride request..."}
+            </Text>
+          </View>
+        )}
     </ScrollView>
   );
 };
@@ -943,7 +931,7 @@ const styles = StyleSheet.create({
     fontFamily: "Montserrat-SemiBold",
   },
   spinningIcon: {
-    transform: [{rotate: "0deg"}],
+    transform: [{ rotate: "0deg" }],
   },
   priceContainer: {
     flexDirection: "row",

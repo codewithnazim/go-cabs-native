@@ -35,7 +35,7 @@ export interface Bid {
   driverFcmToken?: string; // For notifications
   vehicleDetails: string; // e.g., "Toyota Camry - ABC 123"
   bidAmount: number;
-  currency?: string; // e.g., "USD", "ETH"
+  currency?: string; // e.g., "INR", "SOL"
   estimatedArrivalTime: string; // e.g., "5 mins"
   bidAt: string; // ISO string for timestamp
   status:

@@ -5,7 +5,7 @@ import { AppModalProps } from './modalConfig';
 import TimerModal from './TimerModal';
 
 const AppModal: React.FC<AppModalProps> = (props) => {
-  const { type, isOpen, onClose } = props;
+  const { type, isOpen, onClose, isLoading } = props;
 
   const renderModalContent = () => {
     switch (type) {
@@ -32,7 +32,7 @@ const AppModal: React.FC<AppModalProps> = (props) => {
       onRequestClose={onClose}
     >
       <View style={styles.modalOverlay}>
-        {renderModalContent()}
+        {isLoading ? <Text>Waiting for Driver Bids</Text> : renderModalContent()}
       </View>
     </Modal>
   );
