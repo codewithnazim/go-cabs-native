@@ -2,6 +2,7 @@ import React from 'react';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { NavigationContainer, DefaultTheme } from '@react-navigation/native';
 import { backgroundPrimary } from '../theme/colors';
+import { useNavigationPersistence } from '../hooks/useNavigationPersistence';
 import AuthRoutes from './Auth.Routes';
 import OnbordingRoutes from './Onboarding.Routes';
 import UserRoutes from './User.Routes';
@@ -19,8 +20,14 @@ const MyTheme = {
 };
 
 const RootNavigator = () => {
+    const { navigationState, handleNavigationStateChange } = useNavigationPersistence();
+
     return (
-        <NavigationContainer theme={MyTheme}>
+        <NavigationContainer 
+            theme={MyTheme}
+            initialState={navigationState || undefined}
+            onStateChange={handleNavigationStateChange}
+        >
             <RootStack.Navigator screenOptions={{ headerShown: false }}>
                 <RootStack.Screen name="AuthScreens" component={AuthRoutes} />
                 <RootStack.Screen name="OnboardingScreens" component={OnbordingRoutes} />
