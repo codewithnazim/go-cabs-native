@@ -8,6 +8,7 @@ import {
   Modal,
   Alert,
   Dimensions,
+  ScrollView,
 } from "react-native";
 import {Icon} from "@ui-kitten/components";
 import QRCode from "react-native-qrcode-svg";
@@ -129,6 +130,9 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
       transparent={true}
       animationType="slide"
       onRequestClose={handleClose}>
+        <ScrollView>
+
+        
       <View style={styles.modalOverlay}>
         <View style={styles.modalContent}>
           {/* Header */}
@@ -237,6 +241,7 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
           </View>
         </View>
       </View>
+      </ScrollView>
     </Modal>
   );
 };
